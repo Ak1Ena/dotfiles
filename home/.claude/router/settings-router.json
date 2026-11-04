@@ -1,0 +1,1 @@
+{ "env": { "ANTHROPIC_BASE_URL": "https://api.anthropic.com", "HTTPS_PROXY": "http://127.0.0.1:8788", "NO_PROXY": "localhost,127.0.0.1", "NODE_EXTRA_CA_CERTS": "/Users/m129/.mitmproxy/mitmproxy-ca-cert.pem" } }

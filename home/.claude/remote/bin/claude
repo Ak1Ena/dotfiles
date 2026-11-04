@@ -1,0 +1,25 @@
+#!/bin/bash
+# Shim: every interactive `claude` opens in its own tmux session (so Claude Remote sees it).
+# Passes straight through inside tmux, when not on a terminal, and for one-shot/subcommands.
+REAL=$HOME/.local/bin/claude
+case " $* " in *" -p "*|*" --print "*) exec "$REAL" "$@";; esac
+case "$1" in -v|--version|-h|--help|update|mcp|config|doctor|auth|plugin|install|setup-token|agents) exec "$REAL" "$@";; esac
+[ ! -t 0 ] || [ ! -t 1 ] && exec "$REAL" "$@"
+# Team mode by default (same as c-team): teammates open as tmux panes. Opt out: CLAUDE_NO_TEAM=1 claude
+case " $* " in *" --team-name"*|*" --agent-id"*|*" --settings"*) CLAUDE_NO_TEAM=1;; esac
+if [ -z "$CLAUDE_NO_TEAM" ] && [ -z "$CLAUDE_NO_TMUX" ] && command -v tmux >/dev/null; then
+  export CLAUDE_MODE=team
+  set -- --settings '{"teammateMode":"tmux"}' "$@"
+fi
+if [ -n "$TMUX" ]; then
+  "$REAL" "$@"; rc=$?
+  tmux set -pu @claude_mode 2>/dev/null  # clear status badge on exit
+  exit $rc
+fi
+if [ -n "$CLAUDE_NO_TMUX" ] || ! command -v tmux >/dev/null; then exec "$REAL" "$@"; fi
+dir=$(basename "$PWD" | tr '.:' '--')
+name="claude-${dir}-$(date +%H%M%S)"
+env_args=()
+[ -n "$CLAUDE_MODE" ] && env_args+=(-e "CLAUDE_MODE=$CLAUDE_MODE")
+[ -n "$CLAUDE_CONFIG_DIR" ] && env_args+=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
+exec tmux new-session -s "$name" -c "$PWD" "${env_args[@]}" caffeinate -i "$REAL" "$@"

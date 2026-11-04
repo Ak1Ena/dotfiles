@@ -1,0 +1,402 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+    "ENABLE_TOOL_SEARCH": "true",
+    "HTTPS_PROXY": "http://127.0.0.1:8788",
+    "NO_PROXY": "localhost,127.0.0.1",
+    "NODE_EXTRA_CA_CERTS": "/Users/m129/.mitmproxy/mitmproxy-ca-cert.pem",
+    "PONYTAIL_MAP": "0",
+    "MAX_MCP_OUTPUT_TOKENS": "10000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(rm -f ~/.ssh/id_ecdsa_sk_rk ~/.ssh/id_ecdsa_sk_rk.pub ~/.ssh/config)",
+      "Bash(rm -rf ~/.ssh/sockets)",
+      "Bash(git --version)",
+      "Bash(defaults read:*)",
+      "Bash(head:*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "claude-fable-5-dd-los-1.6-tpg",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pr-changes-requested.sh",
+            "timeout": 15,
+            "statusMessage": "Checking PRs for requested changes..."
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-mode.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/remote-ensure.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/m129/.local/bin/headroom init hook ensure --profile init-user --marker headroom-init-claude",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js' ensure --settings '/Users/m129/.claude/settings.json'",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ledger.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 330
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 0.3 http://127.0.0.1:8787/readyz >/dev/null || /Users/m129/.local/bin/headroom init hook ensure --profile init-user --marker headroom-init-claude",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ledger.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I /Users/m129/.claude/hooks/egm-detect.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "bashOutputMaxChars": 12000,
+  "statusLine": {
+    "type": "command",
+    "command": "bash /Users/m129/.claude/statusline-with-agents.sh"
+  },
+  "enabledPlugins": {
+    "warp@claude-code-warp": true,
+    "caveman@caveman": true,
+    "slack@claude-plugins-official": false,
+    "ponytail@ponytail": true,
+    "frontend-design@anthropic-plugin-directory": true,
+    "skill-creator@anthropic-plugin-directory": true,
+    "superdesign@anthropic-plugin-directory": false,
+    "pstack@pstack-claude": true,
+    "headroom@headroom-marketplace": true,
+    "superpowers@claude-plugins-official": false,
+    "rust-analyzer-lsp@claude-plugins-official": false,
+    "postman@claude-plugins-official": false,
+    "sales@knowledge-work-plugins": false,
+    "legal@knowledge-work-plugins": false,
+    "finance@knowledge-work-plugins": false,
+    "data@knowledge-work-plugins": false,
+    "product-management@knowledge-work-plugins": false,
+    "design@knowledge-work-plugins": false,
+    "productivity@knowledge-work-plugins": false,
+    "cowork-plugin-management@knowledge-work-plugins": false,
+    "egm@egm": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-warp": {
+      "source": {
+        "source": "github",
+        "repo": "warpdotdev/claude-code-warp"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "JuliusBrussee/caveman"
+      }
+    },
+    "autoharness": {
+      "source": {
+        "source": "github",
+        "repo": "tigerless-labs/autoharness"
+      }
+    },
+    "pstack-claude": {
+      "source": {
+        "source": "github",
+        "repo": "michael-denyer/pstack-claude"
+      }
+    },
+    "headroom-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "chopratejas/headroom"
+      }
+    },
+    "egm": {
+      "source": {
+        "source": "github",
+        "repo": "google/elephant-goldfish-model"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high",
+      "autoCompactWindow": 200000
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-fable-5": {
+      "effortLevel": "high"
+    }
+  },
+  "awaySummaryEnabled": false,
+  "pluginConfigs": {
+    "ponytail@ponytail": {
+      "options": {
+        "ledger": true,
+        "sendNames": true
+      }
+    }
+  },
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "obsidian": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "obsidian-mcp-server"
+      ]
+    }
+  }
+}

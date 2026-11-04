@@ -1,0 +1,28 @@
+# secrets: never in git
+/.claude/remote/token
+ngrok.yml
+.env
+.env.*
+*.pem
+*.key
+# machine state, logs, generated
+/.claude/skills/synced/
+node_modules/
+__pycache__/
+uploads/
+logs/
+*.log
+.DS_Store
+# old copies; git history replaces them
+/.claude/remote/*.v[0-9]*
+# session-derived notes and machine state from skill tooling
+.ledger.jsonl
+.sidecar.json*
+evidence-*.md
+/.claude/skills/.archive/
+*.bak*
+# public repo: work-only skills and agents stay local
+/.claude/skills/esig-signature-test/
+/.claude/skills/kp-open-pr/
+/.claude/skills/perf-review/
+/.claude/agents/wil-report-reviewer.md

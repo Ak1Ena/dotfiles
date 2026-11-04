@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.m129.claude-router</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/mitmdump</string>
+    <string>--mode</string><string>regular@8788</string>
+    <string>--mode</string><string>reverse:https://api.anthropic.com@8790</string>
+    <string>--listen-host</string><string>127.0.0.1</string>
+    <string>-s</string><string>/Users/m129/.claude/router/router.py</string>
+    <string>--set</string><string>allow_hosts=^api\.anthropic\.com</string>
+    <string>--set</string><string>flow_detail=0</string>
+  </array>
+  <key>EnvironmentVariables</key><dict><key>PYTHONUNBUFFERED</key><string>1</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/m129/.claude/router/router.log</string>
+  <key>StandardErrorPath</key><string>/Users/m129/.claude/router/router.log</string>
+</dict></plist>

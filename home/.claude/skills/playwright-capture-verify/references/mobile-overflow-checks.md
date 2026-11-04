@@ -1,0 +1,22 @@
+# Mobile overflow and table clipping
+
+Rule: a passing `scrollWidth` check does not prove the layout. Check the numbers and an element crop, then look at the screenshot.
+
+## Tables and shared frames
+- A board token that resizes a shared frame (rail width, content padding, cell padding) can push tables that already scroll sideways into worse clipping. Measure each table's overflow before and after the change, on every page that uses the frame. Keep the token only if no table gets worse. If the board value must give way, list the departure with the measured numbers in the PR, and get the user's decision before the PR leaves draft.
+- Wide tables clip on desktop too. At 1280, a table inside a card can cut its last column (header blank, cell cut at the card edge) while `scrollWidth` still reads 1280. Element-crop each table at 1280 and confirm the last header and last cell sit inside the card. Re-shoot into a new run folder, because a first fix attempt can fail.
+- A user-reported overflow on a page behind login: do not guess from the markup, and do not ask for a password. Ask for a screenshot, the browser width, and the element that sticks out. For a table whose action column is cut off, let long text cells wrap at a max width and tighten cell padding inside the card (CSS only), then re-measure the last header and last cell edge at that width.
+
+## Restyled HTML at mobile width
+- Load the restyled file in Playwright at 1440x900, collect `pageerror`s, and screenshot each role or view.
+- Resize to 390x844 and check `document.documentElement.scrollWidth === 390`. Any value above the viewport width is overflow: fix the grid or the rail collapse before reporting done.
+- When scrollWidth reads above the viewport, name the offender with a rect scan: `[...document.querySelectorAll("body *")].filter(e => e.getBoundingClientRect().right > W + 0.5)`. One real case was a fixed-width language switch, not the grid. Fix that element, then recheck every page at 390.
+- A fixed-height label box with `overflow: hidden` clips a second line (a small grey site line under a name) while scrollWidth still reads 390. Element-crop each labelled box at 390, remove the fixed height so the text wraps, and re-shoot into a new run folder.
+- An SVG or sparkline inside a flex KPI tile squashes or overflows at 390 px. Give the SVG `flex: 0 1 auto`, `min-width: 0` and `max-width: 45%` with a fixed viewBox, so it shrinks with its tile, then element-crop the tile.
+- Wide tables and SVG charts: a scrollWidth check misses content clipped by `overflow: hidden`. Wrap each chart and table in an `overflow-x: auto` box, give the SVG a min-width so it scrolls instead of squashing, and let filter rows wrap so their controls stay reachable. Element-crop each table at 390 and report whether it scrolls or clips.
+- Responsive layouts: check the edges of every breakpoint (for example 1024, 1100, 1279, 1280) as well as 390 and 1280. A box sized as a fixed percentage of an image, with children at natural height, overflows at the in-between widths. Element-crop each card bottom against the art bottom, and each badge against its well, at each width.
+- Restyling an element that a shared stylesheet also targets: grep for later descendant-scoped rules that set the same property. A later rule can silently win (a new pill dot never drew because a later rule set its display). Confirm the new rule in the rendered element, not only in the source.
+- Deleting CSS: after each cut, count `{` against `}` in the file. A left-open `@media` block swallows every rule after it, so those rules apply only at the narrow width and a wide screen gets the broken layout. Shoot at 1440 and 390 before reporting a cleanup done; tsc and DOM checks do not see it.
+- Responsive rearrangement: render one copy of a list and move it with CSS between layouts. Two copies give duplicate test ids, and a Playwright testid locator then fails in strict mode.
+- Screenshotting a reference HTML prototype: set its state through its own controls (click the role switch, then call the screen function), wait for the render, and confirm the heading matches before trusting the shot. A `pageerror` or a script error means that shot is wrong; fix the call and re-shoot.
+- Run Playwright from the project's existing node_modules when one exists. Write the script in a scratch directory and save shots to a dedicated folder outside any repo.

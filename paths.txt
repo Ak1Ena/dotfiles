@@ -1,0 +1,14 @@
+.zprofile
+.bashrc
+.gitconfig
+.tmux.conf
+.claude/settings.json
+.claude/settings.local.json
+.claude/CLAUDE.md
+.claude/statusline-with-agents.sh
+.claude/hooks
+.claude/agents
+.claude/skills
+.claude/remote
+.claude/router
+.agents/skills

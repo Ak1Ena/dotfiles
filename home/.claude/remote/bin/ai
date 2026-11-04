@@ -1,0 +1,8 @@
+#!/bin/bash
+# Shim: `ai` (ai-launcher) opens inside its own tmux session, so the claude it starts shows on Claude Remote.
+REAL=$(PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -v "/.claude/remote/bin" | paste -sd: -) command -v ai)
+case "$1" in -h|--help|-v|--version) exec "$REAL" "$@";; esac
+if [ -n "$TMUX" ] || [ ! -t 0 ] || [ ! -t 1 ] || [ -n "$CLAUDE_NO_TMUX" ] || ! command -v tmux >/dev/null; then exec "$REAL" "$@"; fi
+name="claude-$(basename "$PWD" | tr '.:' '--')-$(date +%H%M%S)"
+env_args=(); [ -n "$CLAUDE_CONFIG_DIR" ] && env_args=(-e "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR")
+exec tmux new-session -s "$name" -c "$PWD" "${env_args[@]}" "$REAL" "$@"
