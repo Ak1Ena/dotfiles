@@ -61,6 +61,10 @@ test('a block does not open the pane by itself; the status says blocked', async 
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
   expect(seen.opened).toEqual([])
   expect(seen.status.at(-1)).toBe('QC: blocked 1/3')
+  const ui = await $.ui.mount(BAND)
+  const red = ((await ui.findAll?.({ type: 'Text' })) ?? []).filter((t: any) => t?.props?.color === 'red').map((t: any) => t.text)
+  await ui.unmount()
+  expect(red).toEqual(['Build ●']) // blocked before QC: the current stage turns red
 })
 
 test('teammate files add no band rows; the tmux dots are still built; bad and stale files are skipped', async ($, on) => {
@@ -72,7 +76,9 @@ test('teammate files add no band rows; the tmux dots are still built; bad and st
   ] })
   await start($)
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
-  expect((await bandText($)).length).toBe(1) // the rail alone: no title, no teammate rows
+  const rows = await bandText($)
+  expect(rows[0]).toBe('Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○') // the rail alone: no title
+  expect(rows.some((t: string) => /builder|old/.test(t ?? ''))).toBe(false) // no teammate rows
   const tmux = seen.runs.filter(a => a[0] === 'bash' && String(a[2]).includes('@wf_team')).at(-1)
   expect(tmux?.at(-1)).toBe('● builder-1 ✓ ● builder-2 Q')
 })
@@ -125,7 +131,7 @@ test('TaskCreate sets the title once; a plugin-origin prompt (the harness only s
   await $.tool.call({ tool: 'TaskCreate', subject: 'Real task', description: 'd' })
   await $.tool.call({ tool: 'TaskCreate', subject: 'Second task', description: 'd' })
   const before = await bandText($)
-  expect(before[0]).toBe('Real task')
+  expect(before[0]).toBe('▍ Real task')
   await $.prompt.submit({ text: 'subagent done' })
   expect(await bandText($)).toEqual(before)
   const p = await $.ui.mount(PANE)

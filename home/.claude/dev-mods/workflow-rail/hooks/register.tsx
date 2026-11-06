@@ -182,10 +182,19 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const bad = isBlocked(await read($, qc))
     const name = (await read($, title)).text
+    // Color rail (band-styles artifact): done green, current bold cyan, pending dim, blocked red.
+    const seg = (i: number) => {
+      const m = mark(i, lvl, bad)
+      const label = `${STAGES[i]} ${m}`
+      return m === '✓' ? <Text color="green">{label}</Text>
+        : m === '✗' || (bad && m === '●') ? <Text color="red" bold>{label}</Text> // a block before QC still shows red
+        : m === '●' ? <Text color="cyan" bold>{label}</Text>
+        : <Text dimColor>{label}</Text>
+    }
     return (
       <Box flexDirection="column">
-        {name !== '' && <Text bold>{name}</Text>}
-        <Text color={bad ? 'red' : undefined}>{rail(lvl, bad)}</Text>
+        {name !== '' && <Text><Text dimColor>▍ </Text><Text bold>{name}</Text></Text>}
+        <Text>{STAGES.flatMap((_, i) => (i > 0 ? [<Text dimColor> · </Text>, seg(i)] : [seg(i)]))}</Text>
       </Box>
     )
   })
