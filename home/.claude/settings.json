@@ -344,7 +344,8 @@
     "design@knowledge-work-plugins": false,
     "productivity@knowledge-work-plugins": false,
     "cowork-plugin-management@knowledge-work-plugins": false,
-    "egm@egm": true
+    "egm@egm": true,
+    "workflow-rail@workflow-rail-local": true
   },
   "extraKnownMarketplaces": {
     "claude-code-warp": {
@@ -387,6 +388,12 @@
       "source": {
         "source": "github",
         "repo": "google/elephant-goldfish-model"
+      }
+    },
+    "workflow-rail-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/workflow-rail"
       }
     }
   },

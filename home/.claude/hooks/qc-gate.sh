@@ -3,6 +3,7 @@
 #   qc-gate.sh baseline  SessionStart: snapshot the cwd repo before Claude works
 #   qc-gate.sh track     PreToolUse Edit|Write|MultiEdit|NotebookEdit: snapshot a repo before its first edit
 #   qc-gate.sh mark      SubagentStop: reviewer ran / guardrail PASS on the current change
+#   qc-gate.sh status    read-only: JSON array per tracked repo {repo,lines,reviewed,passed,blocks,needs_gate}
 #   qc-gate.sh gate      Stop: block until reviewer ran and guardrail PASSed on the current change
 # "Change" = working tree vs the session-start snapshot, so commits do not hide work and
 # pre-existing WIP does not count. Changes under QC_MIN_LINES code lines skip the gate.
@@ -23,7 +24,8 @@ sid=$(jq -r '.session_id // empty' <<<"$input" 2>/dev/null)
 cwd=$(jq -r '.cwd // empty' <<<"$input" 2>/dev/null)
 [[ -n $sid ]] || exit 0
 state="$HOME/.claude/work/$sid/qc"
-mkdir -p "$state"
+[[ $mode == status ]] || mkdir -p "$state"  # status is read-only: no state dir created
+export GIT_OPTIONAL_LOCKS=0  # polling must never take .git/index.lock
 
 key() { printf %s "$1" | shasum | cut -c1-12; }
 toplevel() { git -C "$1" rev-parse --show-toplevel 2>/dev/null; }
@@ -108,6 +110,18 @@ mark)
       rm -f "$state/$k.pass"
     fi
   done
+  ;;
+
+status)  # read-only: feeds the workflow mod
+  while read -r r; do
+    [[ -d $r ]] || continue
+    k=$(key "$r"); read -r h n < <(measure "$r")
+    rv=$(cat "$state/$k.reviewer" 2>/dev/null || echo 0)
+    ok=false; [[ $(cat "$state/$k.pass" 2>/dev/null) == "$h" ]] && ok=true
+    jq -nc --arg r "$r" --argjson n "${n:-0}" --argjson rv "$rv" --argjson ok "$ok" \
+      --argjson b "$(cat "$state/$k.blocks.$h" 2>/dev/null || echo 0)" --argjson min "$QC_MIN_LINES" \
+      '{repo:$r,lines:$n,reviewed:$rv,passed:$ok,blocks:$b,needs_gate:($n >= $min and ($rv == 0 or $n > 2*$rv or ($ok|not)))}'
+  done < <(repos) | jq -sc .
   ;;
 
 gate)

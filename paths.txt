@@ -12,3 +12,4 @@
 .claude/remote
 .claude/router
 .agents/skills
+.claude/dev-mods/workflow-rail

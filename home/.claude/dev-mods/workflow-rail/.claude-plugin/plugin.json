@@ -1,0 +1,6 @@
+{
+  "name": "workflow-rail",
+  "version": "0.1.0",
+  "description": "Live Plan > Build > Prove > QC > Report rail, QC status line, auto QC pane and /workflow, team rows",
+  "types": "./hooks/state.d.ts"
+}

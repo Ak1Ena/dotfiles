@@ -94,6 +94,19 @@ R=$T/r11; mkdir -p "$R"; (cd "$R" && git init -q); S=t11-$$
 ev $S "$R" baseline; seq 1 30 >"$R/new.js"
 check "no-commit repo blocks" block "$(ev $S "$R" gate)"
 
+# 12. status is read-only JSON: lines, reviewed, passed, blocks, needs_gate
+R=$T/r12; newrepo "$R"; S=t12-$$
+ev $S "$R" baseline; seq 1 20 >>"$R/a.js"
+st() { ev $S "$R" status | jq -r "$1"; }
+[[ $(st '.[0].lines,.[0].needs_gate,.[0].blocks' | tr '\n' ' ') == "20 true 0 " ]] && echo "PASS status dirty" || { echo "FAIL status dirty: $(ev $S "$R" status)"; fails=$((fails+1)); }
+ev $S "$R" gate >/dev/null
+[[ $(st '.[0].blocks') == 1 ]] && echo "PASS status counts gate blocks" || { echo "FAIL status blocks"; fails=$((fails+1)); }
+ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
+[[ $(st '.[0].passed,.[0].needs_gate' | tr '\n' ' ') == "true false " ]] && echo "PASS status after PASS" || { echo "FAIL status after PASS: $(ev $S "$R" status)"; fails=$((fails+1)); }
+[[ $(ev t12b-$$ "$R" status) == "[]" ]] && echo "PASS status empty session" || { echo "FAIL status empty"; fails=$((fails+1)); }
+
+[[ ! -d $HOME/.claude/work/t12b-$$ ]] && echo "PASS status creates no state dir" || { echo "FAIL status made state dir"; fails=$((fails+1)); }
+
 echo "$fails failed (temp: $T)"
-for s in t1 t2 t3 t4 t5 t6 t7 t8 t9 t11; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
+for s in t1 t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
 exit $((fails > 0))
