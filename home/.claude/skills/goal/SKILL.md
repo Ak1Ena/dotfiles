@@ -48,7 +48,7 @@ Split the goal into phases and dispatch each to the right tier. Use the `Agent` 
 | Analysis | `sonnet` | `general-purpose` | Compare approaches, trace a bug to its cause, summarize an API or doc. Returns findings, not edits. |
 | Code | `opus` | `general-purpose` | Write the change. |
 | Test | `opus` | `general-purpose` | Write and run tests, fix failures until green. |
-| Review | `opus` | `caveman:cavecrew-reviewer` (if present) else `general-purpose` | Adversarial pass over the diff. |
+| QC | `sonnet` | `reviewer` + `guardrail` (one message, parallel) | Bugs/test gaps in the diff + real tests/callers, PASS or BLOCK. Re-run `guardrail` after fixes until PASS. The Stop hook gate enforces this. |
 
 Rules for dispatch:
 

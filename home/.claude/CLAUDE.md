@@ -8,7 +8,7 @@
 1. **Understand first.** Restate the goal in one line. Read only what the task touches. Ask the user only for decisions that are truly theirs; otherwise pick the sensible default and say so.
 2. **Plan small, verifiable steps.** For multi-step work, list the steps (TaskCreate/todo). Each step ends in something you can check.
 3. **Do, then prove.** Run the real test, build, or app. "Should work" is not done. Report failures with the shortest decisive output line.
-4. **Review before done.** After a non-trivial batch of edits, run the `reviewer` agent on the diff, fix confirmed findings, then report.
+4. **QC before done.** Workflow is flexible (inline for small work, `/goal` or pstack for big), but QC is not: after code changes (10+ lines, docs excluded), spawn `reviewer` and `guardrail` in one message, fix confirmed findings, re-run `guardrail` until `VERDICT: PASS`, then report. The Stop hook `hooks/qc-gate.sh` enforces this and blocks finishing until it is done.
 5. **Report like a human.** What changed, how it was verified, what was skipped, and any risk. No narration.
 
 Process skills from plugins (superpowers, pstack, postman) are tools, not mandates: use one when the task is multi-step, unclear, or is a bug with an unknown cause. Skip them for questions, single-file changes, and lookups.

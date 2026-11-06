@@ -82,6 +82,14 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/qc-gate.sh baseline"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -113,6 +121,14 @@
             "type": "command",
             "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
             "timeout": 60
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/qc-gate.sh gate"
           }
         ]
       }
@@ -169,6 +185,15 @@
             "type": "command",
             "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
             "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/qc-gate.sh track"
           }
         ]
       }
@@ -236,6 +261,14 @@
             "type": "command",
             "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/qc-gate.sh mark"
           }
         ]
       }
