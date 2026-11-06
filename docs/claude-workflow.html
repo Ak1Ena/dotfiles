@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code Work Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* layout: one reading column; diagram and terminal mocks break wider. Ink-blue neutrals, blue accent, semantic pass/block/wait kept separate */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #1b2130;
+  --muted: #5d6679;
+  --line: #d9dde6;
+  --accent: #2f5bd3;
+  --pass: #1f8a4c;
+  --block: #c23a3a;
+  --wait: #b7791f;
+  --term-bg: #12151d;
+  --term-ink: #d7dbe4;
+  --term-dim: #7c8496;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10131a; --surface: #171b24; --ink: #e4e7ee; --muted: #9aa3b5; --line: #2a3040;
+    --accent: #7c9cff; --pass: #4cc07f; --block: #ff7a7a; --wait: #e8b04f;
+    --term-bg: #0a0c11; --term-ink: #d7dbe4; --term-dim: #7c8496;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10131a; --surface: #171b24; --ink: #e4e7ee; --muted: #9aa3b5; --line: #2a3040;
+  --accent: #7c9cff; --pass: #4cc07f; --block: #ff7a7a; --wait: #e8b04f;
+  --term-bg: #0a0c11; --term-ink: #d7dbe4; --term-dim: #7c8496;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--font-body); }
+main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 64px; display: grid; gap: 44px; }
+.prose { max-width: 68ch; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: 2rem; font-weight: 600; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+header { display: grid; gap: 10px; }
+header p { color: var(--muted); font-size: 1.05rem; }
+section { display: grid; gap: 16px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; overflow-x: auto; }
+figure svg { display: block; width: 100%; min-width: 820px; height: auto; color: var(--ink); }
+figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 12px; max-width: 80ch; }
+
+.scenarios { display: flex; flex-wrap: wrap; gap: 8px; }
+.scenarios button {
+  font: 500 0.9rem var(--font-body); padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.scenarios button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.scenarios button:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scenario-note { color: var(--muted); font-size: 0.95rem; max-width: 80ch; }
+
+.term {
+  background: var(--term-bg); color: var(--term-ink); border-radius: 10px; font: 13px/1.6 var(--font-mono);
+  overflow-x: auto; border: 1px solid #000;
+}
+.term-bar { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid #222838; color: var(--term-dim); font-size: 12px; align-items: center; }
+.term-bar i { width: 10px; height: 10px; border-radius: 50%; background: #2d3343; display: inline-block; }
+.term-bar span { margin-left: 8px; }
+.term-body { display: grid; grid-template-columns: minmax(520px, 1fr) 300px; min-width: 840px; }
+.chat { padding: 14px 18px; display: grid; gap: 4px; align-content: start; min-height: 330px; border-right: 1px solid #222838; }
+.chat .dim { color: var(--term-dim); }
+.chat .tool { color: #9fb6ff; }
+.chat .you { color: #fff; }
+.band { margin-top: 14px; padding: 6px 10px; border: 1px solid #2a3142; border-radius: 6px; white-space: pre; }
+.prompt { margin-top: 6px; padding: 6px 10px; border: 1px solid #3a4256; border-radius: 6px; color: var(--term-dim); }
+.statusline { padding: 2px 10px; color: var(--term-dim); white-space: pre; }
+.pane { padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
+.pane h4 { margin: 0; font: 600 12px var(--font-mono); color: var(--term-dim); letter-spacing: 0; }
+.pane ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ok { color: #4cc07f; } .bad { color: #ff7a7a; } .run { color: #e8b04f; } .off { color: #5b6275; } .acc { color: #9fb6ff; }
+
+.surfaces { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.card p { color: var(--muted); font-size: 0.93rem; }
+.pill { justify-self: start; font: 600 0.75rem var(--font-body); padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.on { color: var(--pass); } .pill.opt { color: var(--muted); }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.93rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+
+.tmuxbar { padding: 4px 14px; background: #1d2333; color: var(--term-dim); white-space: pre; border-top: 1px solid #000; min-width: 840px; }
+.term-body.solo { grid-template-columns: 1fr; }
+.term-body.solo .chat { border-right: 0; min-height: 150px; }
+.term-body.solo .pane { display: none; }
+.c1 { color: #6fa8ff; } .c2 { color: #d58cff; } .c3 { color: #4cc07f; }
+.picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+fieldset { margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px; display: grid; gap: 6px; align-content: start; }
+legend { font-weight: 600; padding: 0 6px; }
+.picker label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+.picker label:hover { border-color: var(--line); }
+.picker label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.picker input { margin-top: 4px; accent-color: var(--accent); }
+.picker input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.picker b { font-weight: 600; }
+.picker small { display: block; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; margin-top: 2px; overflow-wrap: anywhere; }
+.choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.choice code { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; overflow-wrap: anywhere; }
+#copy { font: 600 0.9rem var(--font-body); padding: 8px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+#copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.band:empty { display: none; }
+ol.next { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; max-width: 75ch; }
+@media (prefers-reduced-motion: no-preference) { .scenarios button { transition: background .15s, color .15s; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Claude Code Work Loop</h1>
+    <p class="prose">The path through a task changes with its size. The quality check at the end does not change: a hook stops Claude from finishing until <code>reviewer</code> has run and <code>guardrail</code> has passed the current diff.</p>
+  </header>
+
+  <section>
+    <h2>The workflow</h2>
+    <figure>
+      <svg viewBox="0 0 980 330" role="img" aria-label="A prompt is sized, then goes inline or through a plan, then build, prove and QC. QC runs reviewer and guardrail in parallel. A BLOCK loops back to build. A PASS goes to report. The Stop hook gate sits before report and diffs under 10 lines skip QC.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c23a3a"/>
+          </marker>
+          <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#1f8a4c"/>
+          </marker>
+        </defs>
+        <g font-family="IBM Plex Sans, Arial, sans-serif" font-size="13" fill="currentColor" stroke="currentColor">
+          <!-- prompt -->
+          <rect x="10" y="135" width="90" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="55" y="162" text-anchor="middle" stroke="none">Prompt</text>
+          <!-- size -->
+          <polygon points="170,125 220,157 170,189 120,157" fill="none" stroke-width="1.5"/>
+          <text x="170" y="161" text-anchor="middle" stroke="none">Size?</text>
+          <line x1="100" y1="157" x2="118" y2="157" stroke-width="1.5" marker-end="url(#ah)"/>
+          <!-- inline / plan -->
+          <rect x="260" y="60" width="130" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="325" y="80" text-anchor="middle" stroke="none">Plan</text>
+          <text x="325" y="96" text-anchor="middle" stroke="none" font-size="11" opacity=".7">/goal, pstack, tasks</text>
+          <rect x="260" y="210" width="130" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="325" y="230" text-anchor="middle" stroke="none">Inline</text>
+          <text x="325" y="246" text-anchor="middle" stroke="none" font-size="11" opacity=".7">one file, obvious fix</text>
+          <polyline points="170,125 170,82 258,82" fill="none" stroke-width="1.5" marker-end="url(#ah)"/>
+          <text x="178" y="74" stroke="none" font-size="11">big or unclear</text>
+          <polyline points="170,189 170,232 258,232" fill="none" stroke-width="1.5" marker-end="url(#ah)"/>
+          <text x="178" y="252" stroke="none" font-size="11">small</text>
+          <!-- build -->
+          <rect x="430" y="135" width="110" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="485" y="155" text-anchor="middle" stroke="none">Build</text>
+          <text x="485" y="171" text-anchor="middle" stroke="none" font-size="11" opacity=".7">main or builder</text>
+          <polyline points="390,82 410,82 410,150 428,150" fill="none" stroke-width="1.5" marker-end="url(#ah)"/>
+          <polyline points="390,232 410,232 410,164 428,164" fill="none" stroke-width="1.5" marker-end="url(#ah)"/>
+          <!-- prove -->
+          <rect x="580" y="135" width="100" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="630" y="155" text-anchor="middle" stroke="none">Prove</text>
+          <text x="630" y="171" text-anchor="middle" stroke="none" font-size="11" opacity=".7">run real tests</text>
+          <line x1="540" y1="157" x2="578" y2="157" stroke-width="1.5" marker-end="url(#ah)"/>
+          <!-- QC group -->
+          <rect x="720" y="40" width="130" height="240" rx="10" fill="none" stroke="#2f5bd3" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="785" y="62" text-anchor="middle" stroke="none" fill="#2f5bd3" font-weight="600">QC, parallel</text>
+          <rect x="735" y="90" width="100" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="785" y="110" text-anchor="middle" stroke="none">reviewer</text>
+          <text x="785" y="126" text-anchor="middle" stroke="none" font-size="11" opacity=".7">bugs, test gaps</text>
+          <rect x="735" y="180" width="100" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="785" y="200" text-anchor="middle" stroke="none">guardrail</text>
+          <text x="785" y="216" text-anchor="middle" stroke="none" font-size="11" opacity=".7">tests, callers</text>
+          <line x1="680" y1="157" x2="718" y2="157" stroke-width="1.5" marker-end="url(#ah)"/>
+          <!-- block loop -->
+          <polyline points="785,280 785,305 485,305 485,181" fill="none" stroke="#c23a3a" stroke-width="1.5" marker-end="url(#ahb)"/>
+          <text x="635" y="298" text-anchor="middle" stroke="none" fill="#c23a3a" font-size="12">BLOCK or findings: fix, run guardrail again</text>
+          <!-- report -->
+          <rect x="890" y="135" width="80" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="930" y="162" text-anchor="middle" stroke="none">Report</text>
+          <line x1="850" y1="157" x2="888" y2="157" stroke="#1f8a4c" stroke-width="1.5" marker-end="url(#ahp)"/>
+          <text x="869" y="130" text-anchor="middle" stroke="none" fill="#1f8a4c" font-size="11">PASS</text>
+          <!-- skip -->
+          <polyline points="630,135 630,20 930,20 930,133" fill="none" stroke-width="1.2" stroke-dasharray="3 4" marker-end="url(#ah)" opacity=".7"/>
+          <text x="780" y="14" text-anchor="middle" stroke="none" font-size="11" opacity=".8">under 10 changed lines or docs only: no QC needed</text>
+          <!-- gate -->
+          <line x1="878" y1="140" x2="878" y2="205" stroke="#b7791f" stroke-width="3"/>
+          <text x="884" y="232" stroke="none" fill="#b7791f" font-size="11" font-weight="600">Stop gate</text>
+        </g>
+      </svg>
+      <figcaption>Only the start of the path changes. Every route with a real code change goes through QC, and the Stop hook (<code>hooks/qc-gate.sh</code>) stands before Report. It blocks up to 3 times for the same diff, then lets the turn end with a visible warning.</figcaption>
+    </figure>
+  </section>
+
+  <section id="pick">
+    <h2>Pick your design</h2>
+    <p class="prose">Choose one option for each part. The preview shows a team lead pane and updates as you pick. When you are done, copy the line at the bottom and paste it back to Claude.</p>
+    <div class="picker">
+      <fieldset>
+        <legend>Stage band above the prompt</legend>
+        <label><input type="radio" name="band" value="rail" checked><span><b>Stage rail</b> (recommended)<small>Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○</small></span></label>
+        <label><input type="radio" name="band" value="bar"><span><b>Progress bar</b><small>[■■□□□] Build · QC 41 lines unreviewed</small></span></label>
+        <label><input type="radio" name="band" value="qc"><span><b>QC chip only</b><small>QC ○ 41 lines unreviewed, no stages</small></span></label>
+        <label><input type="radio" name="band" value="off"><span><b>No band</b><small>Keep the prompt area clean</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Status line</legend>
+        <label><input type="radio" name="status" value="text" checked><span><b>Words</b> (recommended)<small>QC: 41 lines unreviewed</small></span></label>
+        <label><input type="radio" name="status" value="glyph"><span><b>Compact</b><small>QC○41 · QC✗1/3 · QC✓</small></span></label>
+        <label><input type="radio" name="status" value="off"><span><b>Nothing</b><small>Status line stays as it is today</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Side pane</legend>
+        <label><input type="radio" name="pane" value="auto" checked><span><b>Opens when the gate fires</b> (recommended)<small>Shows findings exactly when you need them; /workflow opens it anytime</small></span></label>
+        <label><input type="radio" name="pane" value="open"><span><b>Always open</b><small>Pinned beside the chat while a task runs</small></span></label>
+        <label><input type="radio" name="pane" value="none"><span><b>Only with /workflow</b><small>Never opens by itself</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Teammates</legend>
+        <label><input type="radio" name="team" value="both" checked><span><b>Band row + tmux dots</b> (recommended)<small>Detail in the lead pane, glance in the tmux bar</small></span></label>
+        <label><input type="radio" name="team" value="rows"><span><b>Band row only</b><small>One entry per teammate under the lead's band</small></span></label>
+        <label><input type="radio" name="team" value="dots"><span><b>tmux dots only</b><small>● builder-1 ✓ ● builder-2 B in the tmux status bar</small></span></label>
+      </fieldset>
+    </div>
+    <div class="scenarios" role="group" aria-label="Preview moment">
+      <button type="button" id="pv-build" data-p="build" aria-pressed="true">Building</button>
+      <button type="button" id="pv-block" data-p="block">Gate fired</button>
+      <button type="button" id="pv-pass" data-p="pass">Passed</button>
+    </div>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span>claude · lead · team orders-export</span></div>
+      <div class="term-body" id="pbody">
+        <div>
+          <div class="chat" id="pchat"></div>
+          <div style="padding: 0 18px 12px;">
+            <div class="band" id="pband"></div>
+            <div class="prompt">&gt; </div>
+            <div class="statusline" id="pstatus"></div>
+          </div>
+        </div>
+        <div class="pane" id="ppane"></div>
+      </div>
+      <div class="tmuxbar" id="ptmux"></div>
+    </div>
+    <div class="choice">
+      <code id="choice"></code>
+      <button type="button" id="copy">Copy choice</button>
+      <span id="copied" class="scenario-note" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it looks inside Claude Code</h2>
+    <p class="prose">A small mod reads the same signals the hooks already see and draws the current stage. Pick a moment in a task:</p>
+    <div class="scenarios" role="group" aria-label="Scenario">
+      <button type="button" id="sc-build" data-s="build" aria-pressed="true">Building a feature</button>
+      <button type="button" id="sc-qc" data-s="qc">QC running</button>
+      <button type="button" id="sc-block" data-s="block">Gate fired</button>
+      <button type="button" id="sc-pass" data-s="pass">Passed</button>
+      <button type="button" id="sc-small" data-s="small">Small fix</button>
+    </div>
+    <p class="scenario-note" id="note"></p>
+    <div class="term" aria-live="polite">
+      <div class="term-bar"><i></i><i></i><i></i><span>claude · ~/code/my-app</span></div>
+      <div class="term-body">
+        <div>
+          <div class="chat" id="chat"></div>
+          <div style="padding: 0 18px 12px;">
+            <div class="band" id="band"></div>
+            <div class="prompt">&gt; </div>
+            <div class="statusline" id="status"></div>
+          </div>
+        </div>
+        <div class="pane" id="pane"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Three places it shows up</h2>
+    <div class="surfaces">
+      <div class="card">
+        <span class="pill on">On by default</span>
+        <h3>Stage band above the prompt</h3>
+        <p>One line showing the stages, with the current one lit. It appears only while a task is moving, and is gone in plain Q&amp;A.</p>
+      </div>
+      <div class="card">
+        <span class="pill on">On by default</span>
+        <h3>Status line entry</h3>
+        <p>QC state for the repo: lines not yet reviewed, guardrail PASS or BLOCK, and the gate's block count. Visible even when the band is off.</p>
+      </div>
+      <div class="card">
+        <span class="pill opt">Open with /workflow</span>
+        <h3>Side pane</h3>
+        <p>Full checklist with times, each repo's diff size, the reviewer and guardrail results, and the open findings. Needs a terminal at least 110 columns wide.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>With teammates (c-team)</h2>
+    <p class="prose">Each teammate is its own Claude session in a tmux pane. Each one writes its stage to the team's shared folder, the same one the ledger uses. The lead reads them all, so you follow the whole team from the lead pane. Teammates skip the Stop gate. Their edits land in the lead's repo, so the lead's gate covers the team's whole change.</p>
+    <div class="scenarios" role="group" aria-label="Team view">
+      <button type="button" id="tm-lead" data-t="lead" aria-pressed="true">Lead pane</button>
+      <button type="button" id="tm-block" data-t="block">Guardrail blocked a teammate</button>
+      <button type="button" id="tm-mate" data-t="mate">Teammate pane</button>
+    </div>
+    <p class="scenario-note" id="tnote"></p>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span id="ttitle"></span></div>
+      <div class="term-body" id="tbody">
+        <div>
+          <div class="chat" id="tchat"></div>
+          <div style="padding: 0 18px 12px;">
+            <div class="band" id="tband"></div>
+            <div class="prompt">&gt; </div>
+            <div class="statusline" id="tstatus"></div>
+          </div>
+        </div>
+        <div class="pane" id="tpane"></div>
+      </div>
+      <div class="tmuxbar" id="tmux"></div>
+    </div>
+    <figure>
+      <svg viewBox="0 0 980 200" role="img" aria-label="Lead hands tasks to builder teammates. Each builder reports done to the lead, the lead sends the change to guardrail. A BLOCK goes back to the builder that owns it. When guardrail passes and reviewer has run, the lead's Stop gate lets the lead report.">
+        <defs>
+          <marker id="ta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="tb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c23a3a"/></marker>
+        </defs>
+        <g font-family="IBM Plex Sans, Arial, sans-serif" font-size="13" fill="currentColor" stroke="currentColor">
+          <rect x="20" y="78" width="110" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="75" y="105" text-anchor="middle" stroke="none">Lead</text>
+          <rect x="250" y="20" width="130" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="315" y="47" text-anchor="middle" stroke="none">builder-1</text>
+          <rect x="250" y="136" width="130" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="315" y="163" text-anchor="middle" stroke="none">builder-2</text>
+          <polyline points="130,92 190,42 248,42" fill="none" stroke-width="1.5" marker-end="url(#ta)"/>
+          <polyline points="130,108 190,158 248,158" fill="none" stroke-width="1.5" marker-end="url(#ta)"/>
+          <text x="196" y="88" stroke="none" font-size="11">task</text>
+          <rect x="500" y="78" width="130" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="565" y="98" text-anchor="middle" stroke="none">reviewer +</text>
+          <text x="565" y="114" text-anchor="middle" stroke="none">guardrail</text>
+          <polyline points="380,42 440,42 440,92 498,92" fill="none" stroke-width="1.5" marker-end="url(#ta)"/>
+          <polyline points="380,158 440,158 440,108 498,108" fill="none" stroke-width="1.5" marker-end="url(#ta)"/>
+          <text x="446" y="72" stroke="none" font-size="11">done</text>
+          <polyline points="565,136 565,190 330,190 330,182" fill="none" stroke="#c23a3a" stroke-width="1.5" marker-end="url(#tb)"/>
+          <text x="450" y="184" text-anchor="middle" stroke="none" fill="#c23a3a" font-size="11">BLOCK goes to the owner</text>
+          <line x1="630" y1="100" x2="738" y2="100" stroke-width="1.5" marker-end="url(#ta)"/>
+          <text x="684" y="92" text-anchor="middle" stroke="none" font-size="11">PASS</text>
+          <line x1="760" y1="70" x2="760" y2="130" stroke="#b7791f" stroke-width="3"/>
+          <text x="768" y="146" stroke="none" fill="#b7791f" font-size="11" font-weight="600">lead's Stop gate</text>
+          <rect x="800" y="78" width="140" height="44" rx="8" fill="none" stroke-width="1.5"/>
+          <text x="870" y="105" text-anchor="middle" stroke="none">Lead reports</text>
+          <line x1="740" y1="100" x2="798" y2="100" stroke-width="1.5" marker-end="url(#ta)"/>
+        </g>
+      </svg>
+      <figcaption>Builders never decide that their own work is done. The lead sends each finished task to QC, a BLOCK goes back to the builder that owns the file, and only the lead faces the Stop gate.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Where each stage comes from</h2>
+    <p class="prose">Claude reports nothing by hand. Each stage is read from an event that is already happening, so the display cannot claim work that did not run.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Stage</th><th>Lit when</th><th>Done when</th></tr></thead>
+        <tbody>
+          <tr><td>Plan</td><td><code>/goal</code> or a pstack skill loads, or a task list is created</td><td>First file edit</td></tr>
+          <tr><td>Build</td><td>Edit or Write, by the main thread or a <code>builder</code> subagent</td><td>A test, build or lint command runs</td></tr>
+          <tr><td>Prove</td><td>Bash runs a command matching test, build, lint or tsc</td><td>The command exits; red if it failed</td></tr>
+          <tr><td>QC</td><td><code>reviewer</code> or <code>guardrail</code> starts</td><td><code>guardrail</code> returns <code>VERDICT: PASS</code> on the current diff hash</td></tr>
+          <tr><td>Report</td><td>The turn ends and the Stop gate lets it through</td><td>Next prompt resets the band</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Next step if this looks right</h2>
+    <ol class="next">
+      <li>Build the mod in <code>~/.claude/dev-mods/</code>: band, status line, and the <code>/workflow</code> pane, reading the QC gate's state files so both agree.</li>
+      <li>Claude Code asks once whether to turn on mods written in this session. Pick <em>Turn them on</em> to see it live.</li>
+      <li>Each session writes its stage to the team folder; the lead mod reads the team rows from it, and the tmux status dots get a stage letter.</li>
+      <li>Sync to dotfiles with the QC gate change.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+const S = {
+  build: {
+    note: "Mid-feature. Plan done, Claude editing files. QC not needed yet, but 41 changed lines are waiting for review.",
+    chat: [
+      ["you", "> add retry to the upload client"],
+      ["dim", "  Plan: 3 tasks"],
+      ["tool", "  Edit src/upload/client.ts"],
+      ["tool", "  Edit src/upload/retry.ts"],
+      ["tool", "  Write src/upload/retry.test.ts"]
+    ],
+    band: [["ok","Plan ✓"],["off"," · "],["run","Build ●"],["off"," · Prove ○ · QC ○ · Report ○"]],
+    status: [["off","opus 5.5 · my-app · "],["run","QC: 41 lines unreviewed"]],
+    pane: {
+      stages: [["ok","✓ Plan","0:42"],["run","● Build","2:10"],["off","○ Prove",""],["off","○ QC",""],["off","○ Report",""]],
+      repo: [["acc","my-app"],["off","+38 -3 in 3 files"]],
+      qc: [["off","reviewer   not run"],["off","guardrail  not run"]],
+      find: []
+    }
+  },
+  qc: {
+    note: "Tests passed, so QC started. Both agents run in parallel; the band shows which one is still working.",
+    chat: [
+      ["tool", "  Bash npm test -- upload"],
+      ["ok", "  ✓ 12 passed"],
+      ["tool", "  Agent reviewer   (running)"],
+      ["tool", "  Agent guardrail  (running)"]
+    ],
+    band: [["ok","Plan ✓ · Build ✓ · Prove ✓"],["off"," · "],["run","QC ● reviewer, guardrail"],["off"," · Report ○"]],
+    status: [["off","opus 5.5 · my-app · "],["run","QC: running"]],
+    pane: {
+      stages: [["ok","✓ Plan","0:42"],["ok","✓ Build","3:05"],["ok","✓ Prove","0:18"],["run","● QC","0:51"],["off","○ Report",""]],
+      repo: [["acc","my-app"],["off","+38 -3 in 3 files"]],
+      qc: [["run","reviewer   running"],["run","guardrail  running"]],
+      find: []
+    }
+  },
+  block: {
+    note: "Claude tried to finish after a fix without running guardrail again. The Stop hook refused, and the band turns red until QC passes.",
+    chat: [
+      ["tool", "  Edit src/upload/retry.ts   (fix reviewer finding)"],
+      ["dim", "  Done. Retry now backs off."],
+      ["bad", "  Stop hook: QC gate: no guardrail PASS on the current diff"],
+      ["tool", "  Agent guardrail  (running)"]
+    ],
+    band: [["ok","Plan ✓ · Build ✓ · Prove ✓"],["off"," · "],["bad","QC ✗ gate blocked 1/3"],["off"," · Report ○"]],
+    status: [["off","opus 5.5 · my-app · "],["bad","QC: BLOCK, diff changed after PASS"]],
+    pane: {
+      stages: [["ok","✓ Plan","0:42"],["ok","✓ Build","3:40"],["ok","✓ Prove","0:18"],["bad","✗ QC","gate 1/3"],["off","○ Report",""]],
+      repo: [["acc","my-app"],["off","+44 -3 in 3 files"]],
+      qc: [["ok","reviewer   2 findings"],["bad","guardrail  stale (diff changed)"]],
+      find: [["ok","✓ retry.ts:31 no backoff cap"],["bad","• client.ts:88 timeout not passed"]]
+    }
+  },
+  pass: {
+    note: "Guardrail passed on the exact diff Claude is about to report, so the gate lets the turn end.",
+    chat: [
+      ["tool", "  Agent guardrail"],
+      ["ok", "  VERDICT: PASS"],
+      ["dim", "  Changed: retry with capped backoff in upload client."],
+      ["dim", "  Verified: npm test -- upload, 14 passed."]
+    ],
+    band: [["ok","Plan ✓ · Build ✓ · Prove ✓ · QC ✓ · Report ✓"]],
+    status: [["off","opus 5.5 · my-app · "],["ok","QC: PASS 9f3c"]],
+    pane: {
+      stages: [["ok","✓ Plan","0:42"],["ok","✓ Build","4:02"],["ok","✓ Prove","0:21"],["ok","✓ QC","1:37"],["ok","✓ Report",""]],
+      repo: [["acc","my-app"],["off","+47 -3 in 3 files"]],
+      qc: [["ok","reviewer   no open findings"],["ok","guardrail  PASS on 9f3c"]],
+      find: [["ok","✓ retry.ts:31 no backoff cap"],["ok","✓ client.ts:88 timeout not passed"]]
+    }
+  },
+  small: {
+    note: "A one-line typo fix goes inline. The diff is under 10 lines, so QC is marked as not needed instead of pending.",
+    chat: [
+      ["you", "> fix the typo in the error message"],
+      ["tool", "  Edit src/errors.ts"],
+      ["dim", "  Fixed: \"recieve\" to \"receive\"."]
+    ],
+    band: [["ok","Inline ✓ · Build ✓"],["off"," · QC not needed (1 line) · "],["ok","Report ✓"]],
+    status: [["off","opus 5.5 · my-app · "],["off","QC: 1 line, not needed"]],
+    pane: {
+      stages: [["ok","✓ Inline",""],["ok","✓ Build","0:09"],["off","– Prove","skipped"],["off","– QC","under 10 lines"],["ok","✓ Report",""]],
+      repo: [["acc","my-app"],["off","+1 -1 in 1 file"]],
+      qc: [["off","reviewer   not needed"],["off","guardrail  not needed"]],
+      find: []
+    }
+  }
+};
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; return n; };
+const spans = (parts) => parts.map(([c, t]) => el("span", c, t));
+function render(key) {
+  const s = S[key];
+  document.getElementById("note").textContent = s.note;
+  const chat = document.getElementById("chat"); chat.replaceChildren(...s.chat.map(([c, t]) => el("div", c, t)));
+  document.getElementById("band").replaceChildren(...spans(s.band));
+  document.getElementById("status").replaceChildren(...spans(s.status));
+  const p = s.pane, pane = document.getElementById("pane");
+  const list = (rows) => { const ul = document.createElement("ul"); rows.forEach(r => { const li = el("li", r[0], r[1] + (r[2] ? "  " : "")); if (r[2]) li.append(el("span", "off", r[2])); ul.append(li); }); return ul; };
+  const kids = [el("h4", "", "WORKFLOW"), list(p.stages), el("h4", "", "REPO"), list(p.repo), el("h4", "", "QC"), list(p.qc)];
+  if (p.find.length) kids.push(el("h4", "", "FINDINGS"), list(p.find));
+  pane.replaceChildren(...kids);
+  document.querySelectorAll("[data-s]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.s === key)));
+}
+document.querySelectorAll("[data-s]").forEach(b => b.addEventListener("click", () => render(b.dataset.s)));
+render("build");
+
+const TM = {
+  lead: {
+    title: "claude · lead · team orders-export",
+    note: "Lead pane during team work. The band gets a second row with one entry per teammate. The status line counts the whole team's change.",
+    solo: false,
+    chat: [
+      ["you", "> build CSV export for orders"],
+      ["dim", "  Team: builder-1 (API), builder-2 (UI)"],
+      ["c1", "  builder-1  Edit src/api/orders/export.ts"],
+      ["c2", "  builder-2  Edit app/orders/ExportButton.tsx"],
+      ["c1", "  builder-1  Bash npm test -- export   ✓ 9 passed"]
+    ],
+    band: [["ok","Lead  Plan ✓"],["off"," · "],["run","Build ● 2 teammates"],["off"," · QC ○ · Report ○\n"],["c1","● builder-1 "],["ok","Prove ✓ done"],["off","    "],["c2","● builder-2 "],["run","Build ●"]],
+    status: [["off","team orders-export · "],["run","QC: 128 lines unreviewed"]],
+    pane: [["h","TEAM"],["c1","● builder-1   ✓ done"],["off","  api/orders/export.ts +86"],["c2","● builder-2   ● Build"],["off","  orders/ExportButton.tsx +42"],["h","QC (lead runs it)"],["off","reviewer   not run"],["off","guardrail  not run"],["h","GATE"],["run","blocks lead until PASS"]],
+    tmux: [["off","[orders-export] "],["acc","lead"],["off","  "],["c1","● builder-1 ✓"],["off","  "],["c2","● builder-2 B"]]
+  },
+  block: {
+    title: "claude · lead · team orders-export",
+    note: "Guardrail found a broken caller in builder-2's change. The lead sends the finding back to builder-2, and builder-2's row turns red until a new guardrail run passes.",
+    solo: false,
+    chat: [
+      ["c3", "  guardrail  VERDICT: BLOCK"],
+      ["bad", "    ExportButton.tsx:31 calls exportOrders(ids), API now takes {ids, format}"],
+      ["dim", "  → sent to builder-2"],
+      ["c2", "  builder-2  Edit app/orders/ExportButton.tsx"]
+    ],
+    band: [["ok","Lead  Plan ✓ · Build ✓"],["off"," · "],["bad","QC ✗ BLOCK 1 finding"],["off"," · Report ○\n"],["c1","● builder-1 "],["ok","✓ done"],["off","    "],["c2","● builder-2 "],["bad","fixing BLOCK"],["off","    "],["c3","● guardrail "],["off","waiting"]],
+    status: [["off","team orders-export · "],["bad","QC: BLOCK, 1 open finding"]],
+    pane: [["h","TEAM"],["c1","● builder-1   ✓ done"],["c2","● builder-2   ✗ fixing"],["bad","  ExportButton.tsx:31 caller"],["c3","● guardrail   waiting"],["h","QC"],["ok","reviewer   ran, 0 bugs"],["bad","guardrail  BLOCK"],["h","GATE"],["run","lead blocked 0/3"]],
+    tmux: [["off","[orders-export] "],["acc","lead"],["off","  "],["c1","● builder-1 ✓"],["off","  "],["c2","● builder-2 ✗"],["off","  "],["c3","● guardrail Q"]]
+  },
+  mate: {
+    title: "claude · teammate builder-2",
+    note: "A teammate pane only shows its own stage, and says that the lead runs QC. It has no side pane, because teammate panes are narrow.",
+    solo: true,
+    chat: [
+      ["dim", "  From lead: fix ExportButton.tsx:31, API now takes {ids, format}"],
+      ["tool", "  Edit app/orders/ExportButton.tsx"],
+      ["tool", "  Bash npm test -- ExportButton   ✓ 4 passed"],
+      ["dim", "  → reported to lead"]
+    ],
+    band: [["c2","builder-2"],["off","  Build ✓ · Prove ✓ · "],["acc","QC by lead"]],
+    status: [["off","teammate builder-2 → lead · gate off here, lead verifies"]],
+    pane: [],
+    tmux: [["off","[orders-export] "],["off","lead  "],["c1","● builder-1 ✓"],["off","  "],["c2","● builder-2 P"],["off","  "],["c3","● guardrail Q"]]
+  }
+};
+function renderTeam(key) {
+  const t = TM[key];
+  document.getElementById("ttitle").textContent = t.title;
+  document.getElementById("tnote").textContent = t.note;
+  document.getElementById("tbody").classList.toggle("solo", t.solo);
+  document.getElementById("tchat").replaceChildren(...t.chat.map(([c, x]) => el("div", c, x)));
+  document.getElementById("tband").replaceChildren(...spans(t.band));
+  document.getElementById("tstatus").replaceChildren(...spans(t.status));
+  document.getElementById("tmux").replaceChildren(...spans(t.tmux));
+  const kids = [];
+  t.pane.forEach(([c, x]) => { if (c === "h") { kids.push(el("h4", "", x)); } else { kids.push(el("div", c, x)); } });
+  document.getElementById("tpane").replaceChildren(...kids);
+  document.querySelectorAll("[data-t]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.t === key)));
+}
+document.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => renderTeam(b.dataset.t)));
+renderTeam("lead");
+
+const G = { ok: "✓", run: "●", bad: "✗", off: "○" };
+const PV = {
+  build: {
+    stages: [["Plan","ok"],["Build","run"],["Prove","off"],["QC","off"],["Report","off"]],
+    qc: ["run", "41 lines unreviewed", "○41"],
+    mates: [["c1","builder-1","ok","✓ done","✓"],["c2","builder-2","run","Build ●","B"]],
+    chat: [["you","> build CSV export for orders"],["c1","  builder-1  Edit src/api/orders/export.ts"],["c2","  builder-2  Edit app/orders/ExportButton.tsx"]],
+    pane: [["h","WORKFLOW"],["ok","✓ Plan"],["run","● Build"],["off","○ Prove  ○ QC  ○ Report"],["h","QC"],["off","reviewer   not run"],["off","guardrail  not run"]]
+  },
+  block: {
+    stages: [["Plan","ok"],["Build","ok"],["Prove","ok"],["QC","bad"],["Report","off"]],
+    qc: ["bad", "BLOCK, 1 open finding", "✗1/3"],
+    mates: [["c1","builder-1","ok","✓ done","✓"],["c2","builder-2","bad","fixing BLOCK","✗"]],
+    chat: [["c3","  guardrail  VERDICT: BLOCK"],["bad","    ExportButton.tsx:31 old exportOrders(ids) call"],["bad","  Stop hook: QC gate: no guardrail PASS on the current change"]],
+    pane: [["h","WORKFLOW"],["ok","✓ Plan ✓ Build ✓ Prove"],["bad","✗ QC   gate 1/3"],["h","FINDINGS"],["bad","• ExportButton.tsx:31 caller"],["h","QC"],["ok","reviewer   0 bugs"],["bad","guardrail  BLOCK"]]
+  },
+  pass: {
+    stages: [["Plan","ok"],["Build","ok"],["Prove","ok"],["QC","ok"],["Report","ok"]],
+    qc: ["ok", "PASS 9f3c", "✓"],
+    mates: [["c1","builder-1","ok","✓ done","✓"],["c2","builder-2","ok","✓ done","✓"]],
+    chat: [["c3","  guardrail  VERDICT: PASS"],["dim","  Changed: CSV export API + button."],["dim","  Verified: npm test, 13 passed."]],
+    pane: [["h","WORKFLOW"],["ok","✓ Plan ✓ Build ✓ Prove ✓ QC ✓ Report"],["h","QC"],["ok","reviewer   no open findings"],["ok","guardrail  PASS on 9f3c"]]
+  }
+};
+let pv = "build";
+const val = (n) => document.querySelector(`input[name="${n}"]:checked`).value;
+function renderPick() {
+  const s = PV[pv], band = val("band"), status = val("status"), pane = val("pane"), team = val("team");
+  const parts = [];
+  if (band === "rail") s.stages.forEach(([n, c], i) => { if (i) parts.push(["off", " · "]); parts.push([c, `${n} ${G[c]}`]); });
+  if (band === "bar") {
+    const done = s.stages.filter(([, c]) => c === "ok").length, cur = s.stages.find(([, c]) => c !== "ok");
+    parts.push(["off", "["], ["ok", "■".repeat(done)], [cur ? cur[1] : "ok", cur ? "■" : ""], ["off", "□".repeat(Math.max(0, 4 - done)) + "] "], [cur ? cur[1] : "ok", cur ? cur[0] : "Done"], ["off", " · "], [s.qc[0], "QC " + s.qc[1]]);
+  }
+  if (band === "qc") parts.push([s.qc[0], `QC ${G[s.qc[0]]} ${s.qc[1]}`]);
+  if (team !== "dots") {
+    if (parts.length) parts.push(["off", "\n"]);
+    s.mates.forEach(([col, name, c, txt], i) => { if (i) parts.push(["off", "    "]); parts.push([col, `● ${name} `], [c, txt]); });
+  }
+  document.getElementById("pband").replaceChildren(...spans(parts));
+  const st = [["off", "team orders-export"]];
+  if (status === "text") st.push(["off", " · "], [s.qc[0], "QC: " + s.qc[1]]);
+  if (status === "glyph") st.push(["off", " · "], [s.qc[0], "QC" + s.qc[2]]);
+  document.getElementById("pstatus").replaceChildren(...spans(st));
+  const showPane = pane === "open" || (pane === "auto" && pv === "block");
+  document.getElementById("pbody").classList.toggle("solo", !showPane);
+  document.getElementById("ppane").replaceChildren(...s.pane.map(([c, x]) => c === "h" ? el("h4", "", x) : el("div", c, x)));
+  const chat = s.chat.map(([c, x]) => el("div", c, x));
+  if (pane === "none" && pv === "block") chat.push(el("div", "dim", "  (type /workflow for findings)"));
+  document.getElementById("pchat").replaceChildren(...chat);
+  const tm = [["off", "[orders-export] "], ["acc", "lead"]];
+  if (team !== "rows") s.mates.forEach(([col, name, , , letter]) => tm.push(["off", "  "], [col, `● ${name} ${letter}`]));
+  else s.mates.forEach(([col, name]) => tm.push(["off", "  "], [col, `● ${name}`]));
+  document.getElementById("ptmux").replaceChildren(...spans(tm));
+  document.getElementById("choice").textContent = `Workflow display: band=${band}, status=${status}, pane=${pane}, team=${team}`;
+  document.querySelectorAll("[data-p]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === pv)));
+}
+document.querySelectorAll(".picker input").forEach(i => i.addEventListener("change", renderPick));
+document.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => { pv = b.dataset.p; renderPick(); }));
+document.getElementById("copy").addEventListener("click", async () => {
+  const msg = document.getElementById("copied"), text = document.getElementById("choice").textContent;
+  try { await navigator.clipboard.writeText(text); msg.textContent = "Copied. Paste it to Claude."; }
+  catch { const r = document.createRange(); r.selectNodeContents(document.getElementById("choice")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); msg.textContent = "Selected. Press Cmd+C."; }
+});
+renderPick();
+</script>
+</body>
+</html>
