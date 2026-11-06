@@ -11,7 +11,9 @@ args="" pid=$PPID
 for _ in 1 2 3 4 5 6; do
   [[ -z "$pid" || "$pid" -le 1 ]] && break
   comm=$(ps -o comm= -p "$pid" 2>/dev/null)
-  if [[ "${comm##*/}" == claude ]]; then args=$(ps -o args= -p "$pid"); break; fi
+  a=$(ps -o args= -p "$pid" 2>/dev/null)
+  # teammates run as ~/.local/share/claude/versions/<ver>, so comm is not "claude"
+  if [[ "${comm##*/}" == claude || "$a" == *--agent-id* ]]; then args=$a; break; fi
   pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
 done
 
@@ -35,5 +37,11 @@ fi
 
 # Tag the tmux pane so the status bar can show the mode.
 [[ -n "$TMUX_PANE" ]] && tmux set -p -t "$TMUX_PANE" @claude_mode "$mode" 2>/dev/null
+# Teammate name + color for the status bar dots and the agent picker (tmux-team-layout.sh).
+if [[ -n "$TMUX_PANE" && "$mode" == TEAMMATE ]]; then
+  color=$(sed -nE 's/.*--agent-color[ =]([^ ]+).*/\1/p' <<<"$args")
+  case $color in purple) color=magenta;; orange) color=colour208;; pink) color=colour205;; "") color=white;; esac
+  tmux set -p -t "$TMUX_PANE" @agent_name "${agent:-mate}" \; set -p -t "$TMUX_PANE" @agent_color "$color" 2>/dev/null
+fi
 
 jq -n --arg m "$msg" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$m}}'

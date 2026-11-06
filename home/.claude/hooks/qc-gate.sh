@@ -91,6 +91,12 @@ mark)
   agent=$(jq -r '.agent_type // empty' <<<"$input"); agent=${agent##*:}
   [[ $agent == reviewer || $agent == guardrail ]] || exit 0
   msg=$(jq -r '.last_assistant_message // empty' <<<"$input")
+  # Agents that end with a SubagentHandback tool call leave no final text: read the report from the transcript.
+  tp=$(jq -r '.agent_transcript_path // empty' <<<"$input")
+  if [[ -f $tp ]]; then  # the handback is the final word: it wins over earlier text; bad lines are skipped
+    hb=$(jq -nr '[inputs | fromjson? | select(type=="object" and .type=="assistant") | .message.content[]? | select(.type=="tool_use" and .name=="SubagentHandback") | .input.message // empty] | last // empty' -R "$tp" 2>/dev/null)
+    [[ -n $hb ]] && msg=$hb
+  fi
   dirty=() named=()
   while read -r r; do
     [[ -d $r ]] || continue
@@ -151,14 +157,9 @@ gate)
     [[ -n $notes ]] && jq -n --arg m "$notes" '{systemMessage:$m}'
     exit 0
   fi
-  reason="QC gate: code changed but quality check is not done.
-$problems
-Do this before finishing:
-1. Spawn \`reviewer\` (repo path + base ref only, not your conclusions) and \`guardrail\` (repo path, base ref, the goal) in ONE message so they run in parallel.
-2. Fix every confirmed bug/risk finding. Nits are optional.
-3. If you changed code after guardrail ran, run \`guardrail\` again until it returns VERDICT: PASS.
-4. Then report: what changed, how it was verified, what was skipped.
-If the user explicitly said to skip review, tell them the gate fired and stop."
+  # Short on purpose: the user sees this on every block; one self-contained line.
+  reason="QC gate: spawn reviewer (repo path + base ref only) + guardrail in one message, fix bug/risk findings (nits optional), re-run guardrail to VERDICT: PASS, then report (user said skip review: say so, stop).
+${problems%$'\n'}"
   jq -n --arg r "$reason" --arg m "$notes" '{decision:"block", reason:$r} + (if $m != "" then {systemMessage:$m} else {} end)'
   ;;
 esac

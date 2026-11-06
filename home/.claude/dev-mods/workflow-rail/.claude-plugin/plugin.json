@@ -1,6 +1,6 @@
 {
   "name": "workflow-rail",
   "version": "0.1.0",
-  "description": "Plan > Build > Prove > QC > Report band with task title, QC status line, /workflow pane, tmux @wf_team dots in c-team",
+  "description": "Plan > Build > Prove > QC > Report band with task title, QC status line, /workflow toggles QC details in the band, tmux @wf_team dots in c-team",
   "types": "./hooks/state.d.ts"
 }

@@ -26,11 +26,32 @@ seq 1 3 >>"$R/a.js"
 check "3-line change allows" allow "$(ev $S "$R" gate)"
 track $S "$R" "$R/b.js"; seq 1 20 >"$R/b.js"; echo "# doc" >"$R/README.md"
 check "20-line change blocks" block "$(ev $S "$R" gate)"
+r=$(ev $S "$R" gate | jq -r .reason); [[ $r == *"/r1 ("*"no guardrail PASS"* && $(wc -l <<<"$r") -eq 2 ]] && echo "PASS short reason names repo" || { echo "FAIL short reason: $r"; fails=$((fails+1)); }
 ev $S "$R" mark '{agent_type:"reviewer",last_assistant_message:"No findings."}'
 ev $S "$R" mark "$pass_msg"
 check "reviewer + PASS allows" allow "$(ev $S "$R" gate)"
 echo x >>"$R/b.js"
 check "edit after PASS blocks" block "$(ev $S "$R" gate)"
+
+# 1b. a guardrail that ends with a SubagentHandback tool call (no final text) still counts
+R=$T/r1b; newrepo "$R"; S=t1b-$$
+ev $S "$R" baseline; seq 1 20 >>"$R/a.js"; ev $S "$R" mark '{agent_type:"reviewer"}'
+tp=$T/hb.jsonl; jq -nc --arg m $'VERDICT: PASS\nrepo ok' '{type:"assistant",message:{content:[{type:"tool_use",name:"SubagentHandback",input:{message:$m}}]}}' >"$tp"
+ev $S "$R" mark "{agent_type:\"guardrail\",last_assistant_message:\"\",agent_transcript_path:\"$tp\"}"
+check "handback PASS counts" allow "$(ev $S "$R" gate)"
+
+# 1c. last handback wins over quoted text and earlier handbacks; a half-written line is skipped
+R=$T/r1c; newrepo "$R"; S=t1c-$$
+ev $S "$R" baseline; seq 1 20 >>"$R/a.js"; ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
+tp=$T/hb2.jsonl; hbl() { jq -nc --arg m "$1" '{type:"assistant",message:{content:[{type:"tool_use",name:"SubagentHandback",input:{message:$m}}]}}'; }
+{ hbl $'VERDICT: PASS'; echo '{"type":"assist'; hbl $'VERDICT: BLOCK\nbug'; } >"$tp"
+ev $S "$R" mark "{agent_type:\"guardrail\",last_assistant_message:\"VERDICT: PASS\",agent_transcript_path:\"$tp\"}"
+check "last BLOCK handback beats quoted PASS" block "$(ev $S "$R" gate)"
+{ hbl $'VERDICT: BLOCK'; echo 'garbage'; echo '"str"'; echo '[1]'; hbl $'VERDICT: PASS'; } >"$tp"
+ev $S "$R" mark "{agent_type:\"guardrail\",agent_transcript_path:\"$tp\"}"
+check "PASS handback after bad line counts" allow "$(ev $S "$R" gate)"
+ev $S "$R" mark "{agent_type:\"guardrail\",last_assistant_message:\"VERDICT: BLOCK\",agent_transcript_path:\"$T/missing.jsonl\"}"
+check "missing transcript falls back to text" block "$(ev $S "$R" gate)"
 
 # 2. commit does not bypass
 R=$T/r2; newrepo "$R"; S=t2-$$
@@ -108,5 +129,5 @@ ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
 [[ ! -d $HOME/.claude/work/t12b-$$ ]] && echo "PASS status creates no state dir" || { echo "FAIL status made state dir"; fails=$((fails+1)); }
 
 echo "$fails failed (temp: $T)"
-for s in t1 t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
+for s in t1 t1b t1c t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
 exit $((fails > 0))

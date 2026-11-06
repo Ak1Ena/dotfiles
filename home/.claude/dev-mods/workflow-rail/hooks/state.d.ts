@@ -5,6 +5,6 @@ export type Me = { agent: string; lead: string } | 'lead'
 
 declare module 'claude-code' {
   interface PluginState {
-    'workflow-rail': { hit: number; qc: Shaped<Qc[]>; me: Shaped<Me | null>; title: Shaped<Title> }
+    'workflow-rail': { hit: number; qc: Shaped<Qc[]>; me: Shaped<Me | null>; title: Shaped<Title>; detail: boolean }
   }
 }

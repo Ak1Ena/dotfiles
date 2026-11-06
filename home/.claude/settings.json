@@ -15,11 +15,83 @@
       "Bash(rm -rf ~/.ssh/sockets)",
       "Bash(git --version)",
       "Bash(defaults read:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(~/.claude/bin/ro *)",
+      "Bash(/Users/m129/.claude/bin/ro *)"
     ],
-    "defaultMode": "auto"
+    "deny": [
+      "Edit(~/.claude/hooks/readonly-infra.sh)",
+      "Edit(~/.claude/bin/ro)",
+      "Bash(argocd account *)",
+      "Bash(argocd admin *)",
+      "Bash(argocd app actions run*)",
+      "Bash(argocd app create*)",
+      "Bash(argocd app delete*)",
+      "Bash(argocd app delete-resource*)",
+      "Bash(argocd app edit*)",
+      "Bash(argocd app patch*)",
+      "Bash(argocd app patch-resource*)",
+      "Bash(argocd app rollback*)",
+      "Bash(argocd app set*)",
+      "Bash(argocd app sync*)",
+      "Bash(argocd app terminate-op*)",
+      "Bash(argocd app unset*)",
+      "Bash(argocd appset *)",
+      "Bash(argocd cert *)",
+      "Bash(argocd cluster *)",
+      "Bash(argocd gpg *)",
+      "Bash(argocd proj *)",
+      "Bash(argocd repo *)",
+      "Bash(argocd repocreds *)",
+      "Bash(curl *--data*tenant-config*)",
+      "Bash(curl *--request*tenant-config*)",
+      "Bash(curl *-F *tenant-config*)",
+      "Bash(curl *-X DELETE*tenant-config*)",
+      "Bash(curl *-X PATCH*tenant-config*)",
+      "Bash(curl *-X POST*tenant-config*)",
+      "Bash(curl *-X PUT*tenant-config*)",
+      "Bash(curl *-d *tenant-config*)",
+      "Bash(curl *tenant-config*--data*)",
+      "Bash(curl *tenant-config*--request*)",
+      "Bash(curl *tenant-config*-F *)",
+      "Bash(curl *tenant-config*-X *)",
+      "Bash(curl *tenant-config*-d *)",
+      "Bash(kubectl annotate*)",
+      "Bash(kubectl apply*)",
+      "Bash(kubectl attach*)",
+      "Bash(kubectl autoscale*)",
+      "Bash(kubectl cordon*)",
+      "Bash(kubectl cp*)",
+      "Bash(kubectl create*)",
+      "Bash(kubectl debug*)",
+      "Bash(kubectl delete*)",
+      "Bash(kubectl describe secret*)",
+      "Bash(kubectl describe secrets*)",
+      "Bash(kubectl drain*)",
+      "Bash(kubectl edit*)",
+      "Bash(kubectl exec*)",
+      "Bash(kubectl expose*)",
+      "Bash(kubectl get secret*)",
+      "Bash(kubectl get secrets*)",
+      "Bash(kubectl label*)",
+      "Bash(kubectl patch*)",
+      "Bash(kubectl replace*)",
+      "Bash(kubectl rollout*)",
+      "Bash(kubectl run*)",
+      "Bash(kubectl scale*)",
+      "Bash(kubectl set*)",
+      "Bash(kubectl taint*)",
+      "Bash(kubectl uncordon*)"
+    ],
+    "defaultMode": "auto",
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git -C * push:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr ready:*)"
+    ]
   },
-  "model": "claude-fable-5-dd-los-1.6-tpg",
+  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -189,6 +261,16 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/m129/.claude/hooks/readonly-infra.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
@@ -326,7 +408,7 @@
   "enabledPlugins": {
     "warp@claude-code-warp": true,
     "caveman@caveman": true,
-    "slack@claude-plugins-official": false,
+    "slack@claude-plugins-official": true,
     "ponytail@ponytail": true,
     "frontend-design@anthropic-plugin-directory": true,
     "skill-creator@anthropic-plugin-directory": true,
@@ -400,7 +482,6 @@
   "effortLevel": "high",
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "high",
       "autoCompactWindow": 200000
     },
     "claude-sonnet-5-5": {

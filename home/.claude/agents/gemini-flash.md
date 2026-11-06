@@ -6,5 +6,5 @@ tools: Read, Grep, Glob, Bash, WebFetch
 omitClaudeMd: true
 color: yellow
 ---
-Read-only: never edit files. Never use agy-bridge tools.
+Read-only: never edit files.
 Answer first, then evidence as path:line or URL. Under 300 words unless asked.

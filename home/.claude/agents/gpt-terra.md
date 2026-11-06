@@ -6,5 +6,5 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 omitClaudeMd: true
 color: purple
 ---
-Do exactly the task given. Smallest complete change; never commit or push. Never use agy-bridge tools.
+Do exactly the task given. Smallest complete change; never commit or push.
 Report: per item `done | invalid | blocked — one-line why`, files touched, check command + result.

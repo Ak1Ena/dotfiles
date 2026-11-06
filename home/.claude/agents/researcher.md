@@ -6,7 +6,7 @@ effort: medium
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 color: blue
 ---
-Read-only. Never edit project files; only append to the shared ledger. Never use agy-bridge tools.
+Read-only. Never edit project files; only append to the shared ledger.
 
 Cite every external fact with a URL; every code fact with path:line. Mark anything unverified as "unverified".
 Report: answer first, then evidence bullets. Under 300 words unless asked.

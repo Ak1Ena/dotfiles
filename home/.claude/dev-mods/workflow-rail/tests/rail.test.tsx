@@ -3,8 +3,6 @@ import { expect, test } from 'claude-code/testing'
 import { isUserPrompt, promptTitle } from '../hooks/register'
 
 const BAND = { plugin: 'workflow-rail', component: 'AbovePrompt', requestId: 'b', surface: 'terminal', props: { bodyColumns: 80 } } as const
-const PANE = { plugin: 'workflow-rail', component: 'Pane', requestId: 'workflow', surface: 'terminal',
-  props: { title: 'Workflow', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} } } as const
 const dirty = { repo: '/r/x', lines: 41, reviewed: 0, passed: false, blocks: 1, needs_gate: true }
 const passed = { ...dirty, passed: true, needs_gate: false, blocks: 0 }
 
@@ -35,16 +33,20 @@ const bandText = async ($: any) => {
   return all.map((t: any) => t?.text)
 }
 
-test('idle band falls through; after an Edit it shows the rail; pane lists what is missing', async ($, on) => {
+test('idle band falls through; after an Edit it shows the rail; /workflow toggles repo details in the band', async ($, on) => {
   setup(on, { rows: [dirty] })
   await start($)
   expect((await bandText($))[0]).toBe('engine')
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
   expect((await bandText($))[0]).toBe('Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○')
-  const p = await $.ui.mount(PANE)
-  expect((await p.find({ type: 'Text', text: /reviewer not run/ }))?.text).toContain('reviewer not run')
-  expect((await p.find({ type: 'Text', text: /blocks 1\/3/ }))?.text).toContain('41 changed lines')
-  await p.unmount()
+  expect((await bandText($)).some((t: string) => /reviewer not run/.test(t ?? ''))).toBe(false) // details off by default
+  await $.command.run({ command: 'workflow' })
+  const rows = await bandText($)
+  expect(rows.some((t: string) => /^  x · 41 lines/.test(t ?? ''))).toBe(true)
+  expect(rows).toContain('reviewer not run')
+  expect(rows.some((t: string) => /blocks 1\/3/.test(t ?? ''))).toBe(true)
+  await $.command.run({ command: 'workflow' })
+  expect((await bandText($)).some((t: string) => /41 lines/.test(t ?? ''))).toBe(false) // toggled back off
 })
 
 test('a guardrail PASS moves the rail past QC and says QC: passed', async ($, on) => {
@@ -55,7 +57,7 @@ test('a guardrail PASS moves the rail past QC and says QC: passed', async ($, on
   expect(seen.status.at(-1)).toBe('QC: passed')
 })
 
-test('a block does not open the pane by itself; the status says blocked', async ($, on) => {
+test('a block opens nothing by itself; the status says blocked', async ($, on) => {
   const seen = setup(on, { rows: [dirty] })
   await start($)
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
@@ -137,9 +139,6 @@ test('TaskCreate sets the title once; a plugin-origin prompt (the harness only s
   expect(before[0]).toBe('▍ Real task')
   await $.prompt.submit({ text: 'subagent done' })
   expect(await bandText($)).toEqual(before)
-  const p = await $.ui.mount(PANE)
-  expect((await p.find({ type: 'Text', text: /Real task/ }))?.text).toBe('Real task')
-  await p.unmount()
 })
 
 test('a subagent TaskCreate does not set the title', async ($, on) => {
@@ -148,4 +147,21 @@ test('a subagent TaskCreate does not set the title', async ($, on) => {
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
   await $.tool.call({ tool: 'TaskCreate', subject: 'Sub', description: 'd', agentId: 'a1' } as any)
   expect((await bandText($))[0]).toBe('Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○')
+})
+
+test('/workflow while idle shows No task started and the repo rows; with no repos it says so', async ($, on) => {
+  setup(on, { rows: [dirty] })
+  await start($)
+  await $.command.run({ command: 'workflow' })
+  const rows = await bandText($)
+  expect(rows).toContain('No task started')
+  expect(rows).toContain('reviewer not run')
+})
+
+test('/workflow with no tracked repo says No repo tracked yet', async ($, on) => {
+  setup(on, { rows: [] })
+  await start($)
+  await $.command.run({ command: 'workflow' })
+  await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
+  expect(await bandText($)).toContain('No repo tracked yet.')
 })

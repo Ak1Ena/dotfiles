@@ -11,13 +11,13 @@ const me = atom({ plugin: 'workflow-rail', key: 'me' } as const, null as Me | nu
 const raise = (to: number) => (h: number) => Math.max(h, to)
 let lastDots = '' // what this session last wrote to @wf_team
 let lastRefresh = 0 // debounce only; a hot reload resetting it is harmless
+const detail = atom({ plugin: 'workflow-rail', key: 'detail' } as const, false) // /workflow toggles repo rows in the band
 const title = atom({ plugin: 'workflow-rail', key: 'title' } as const, { text: '', byTask: false } as Title, { shape: 'title-1' })
 const clip = (t: string, n: number) => ([...t].length > n ? [...t].slice(0, n - 1).join('') + '…' : t)
 export const isUserPrompt = (e: any) => !e.isMeta && ['composer', 'bridge', 'sdk'].includes(e.origin?.kind)
 export const promptTitle = (e: any) =>
   clip(e.command ? '' : (String(e.text).split('\n').map(l => l.trim()).find(Boolean) ?? '').replace(/\s+/g, ' '), 60)
 const STAGES = ['Plan', 'Build', 'Prove', 'QC', 'Report']
-const PANE = 'workflow'
 const MAX_BLOCKS = 3 // qc-gate.sh QC_MAX_BLOCKS default
 const PROVE = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?(test|build|lint|typecheck)|\btsc\b|\bpytest\b|\bjest\b|\bvitest\b|\bgo\s+test|\bcargo\s+(test|build)|\bbash\s+\S*test\S*\.sh|\bmake\s+test/
 const PLAN_TOOLS = ['TaskCreate', 'TodoWrite']
@@ -29,8 +29,6 @@ const letter = (m: { hit: number; blocked: boolean }) =>
   m.hit >= 5 ? '✓' : m.blocked ? '✗' : 'PBVQR'[m.hit] ?? '·'
 const mark = (i: number, h: number, blocked: boolean) =>
   i === 3 && blocked && h >= 3 ? '✗' : i < h ? '✓' : i === h ? '●' : '○'
-const rail = (h: number, blocked: boolean) =>
-  STAGES.map((s, i) => `${s} ${mark(i, h, blocked)}`).join(' · ')
 
 // Who am I: teammate (agent + lead's session dir) or lead/solo. Read once per load.
 async function whoami($: any): Promise<Me> {
@@ -167,20 +165,24 @@ export const register: Register = on => {
   })
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'workflow', description: 'Show the QC workflow pane' })
+    await $.command.register({ name: 'workflow', description: 'Show or hide QC details in the workflow band' })
     return next(e)
   })
 
   on('command.run', { command: 'workflow' }, async $ => {
-    await $.ui.open({ id: PANE, title: 'Workflow' })
-    return { text: 'Workflow pane opened.' }
+    const isOn = await update($, detail, d => !d)
+    if (isOn) await refresh($, true) // idle sessions have not measured yet
+    return { text: isOn ? 'Workflow details shown above the prompt.' : 'Workflow details hidden.' }
   })
 
+  // No pane: panes share one tabbed panel with every other plugin, so details live in the band.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const lvl = await read($, hit)
-    if (lvl < 0) return next(e)
+    const isDetail = await read($, detail)
+    if (lvl < 0 && !isDetail) return next(e)
     const { Box, Text } = $.ui.resolve(e)
-    const bad = isBlocked(await read($, qc))
+    const q = await read($, qc)
+    const bad = isBlocked(q)
     const name = (await read($, title)).text
     // Color rail (band-styles artifact): done green, current bold cyan, pending dim, blocked red.
     const seg = (i: number) => {
@@ -194,28 +196,17 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {name !== '' && <Text><Text dimColor>▍ </Text><Text bold>{name}</Text></Text>}
-        <Text>{STAGES.flatMap((_, i) => (i > 0 ? [<Text dimColor> · </Text>, seg(i)] : [seg(i)]))}</Text>
-      </Box>
-    )
-  })
-
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    const q = await read($, qc)
-    const lvl = await read($, hit)
-    const name = (await read($, title)).text
-    return (
-      <Box flexDirection="column">
-        {name !== '' && <Text bold>{name}</Text>}
-        <Text bold>{lvl < 0 ? 'No task started' : rail(lvl, isBlocked(q))}</Text>
-        {q.length === 0 && <Text dimColor>No repo tracked yet.</Text>}
-        {q.map(r => (
-          <Box flexDirection="column">
-            <Text>{r.repo}</Text>
-            <Text dimColor>  {r.lines} changed lines · blocks {r.blocks}/{MAX_BLOCKS}</Text>
-            <Text color={r.reviewed > 0 ? undefined : 'yellow'}>  {r.reviewed > 0 ? `reviewer ran on ${r.reviewed} lines` : 'reviewer not run'}</Text>
-            <Text color={r.passed ? undefined : 'yellow'}>  {r.passed ? 'guardrail PASS' : 'no guardrail PASS'}</Text>
-          </Box>
+        {lvl < 0 ? <Text dimColor>No task started</Text>
+          : <Text>{STAGES.flatMap((_, i) => (i > 0 ? [<Text dimColor> · </Text>, seg(i)] : [seg(i)]))}</Text>}
+        {isDetail && q.length === 0 && <Text dimColor>No repo tracked yet.</Text>}
+        {isDetail && q.map(r => (
+          <Text dimColor>
+            {`  ${clip(r.repo.split('/').pop() || r.repo, 30)} · ${r.lines} lines · `}
+            <Text color={r.reviewed > 0 ? undefined : 'yellow'}>{r.reviewed > 0 ? `reviewed ${r.reviewed}` : 'reviewer not run'}</Text>
+            {' · '}
+            <Text color={r.passed ? undefined : 'yellow'}>{r.passed ? 'guardrail PASS' : 'no guardrail PASS'}</Text>
+            {` · blocks ${r.blocks}/${MAX_BLOCKS}`}
+          </Text>
         ))}
       </Box>
     )

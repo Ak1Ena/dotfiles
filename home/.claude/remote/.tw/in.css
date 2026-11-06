@@ -103,7 +103,7 @@
   .u img { @apply mb-1.5 block w-[180px] max-w-full rounded-xl; }
   .u.pending { @apply opacity-60; }
   .qtag { @apply mb-0.5 block text-[11px] font-bold opacity-85; }
-  .a { @apply my-4 max-w-full px-0.5 text-[16px] leading-[1.65]; overflow-wrap: anywhere; }
+  .a { @apply my-4 mr-auto w-fit max-w-[86%] min-w-0 rounded-[22px] rounded-bl-[6px] border border-hair bg-surface px-4 py-2.5 text-[16px] leading-[1.65]; overflow-wrap: anywhere; }
   .a p { @apply mb-3 mt-0; } .a p:last-child { @apply mb-0; }
   .a ul, .a ol { @apply mb-3 mt-1 pl-[22px]; } .a ul { @apply list-disc; } .a ol { @apply list-decimal; }
   .a li::marker { color: var(--accent); }
