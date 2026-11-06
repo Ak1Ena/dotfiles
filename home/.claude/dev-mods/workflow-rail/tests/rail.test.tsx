@@ -10,7 +10,7 @@ const passed = { ...dirty, passed: true, needs_gate: false, blocks: 0 }
 
 // Stands in for the engine; returns what the test can read back.
 function setup(on: any, o: { rows: any; mates?: any[] }) {
-  const seen = { status: [] as any[], opened: [] as string[], t: 10_000_000 }
+  const seen = { status: [] as any[], opened: [] as string[], runs: [] as any[][], t: 10_000_000 }
   on('command.register', () => ({ value: { command: 'workflow' } }))
   on('ui.open', (_: any, e: any) => { seen.opened.push(e.id); return { value: { isPlaced: true } } })
   on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
@@ -19,7 +19,7 @@ function setup(on: any, o: { rows: any; mates?: any[] }) {
   on('session.cwd', () => ({ value: '/r/x' }))
   on('env.get', () => ({ value: '/h' }))
   on('clock.now', () => ({ value: (seen.t += 5000) }))
-  on('process.run', (_: any, e: any) => ({ value: { exitCode: 0, stdout: e.argv?.[1] === 'status' ? JSON.stringify(o.rows) : '', stderr: '' } }))
+  on('process.run', (_: any, e: any) => (seen.runs.push(e.argv), { value: { exitCode: 0, stdout: e.argv?.[1] === 'status' ? JSON.stringify(o.rows) : '', stderr: '' } }))
   on('fs.list', () => ({ value: (o.mates ?? []).map(m => ({ name: m.name, kind: 'file', mtimeMs: m.mtimeMs ?? seen.t })) }))
   on('fs.read', (_: any, e: any) => ({ value: (o.mates ?? []).find(m => e.path.endsWith(m.name))?.body ?? '' }))
   on('fs.write', () => ({ value: {} }))
@@ -55,25 +55,54 @@ test('a guardrail PASS moves the rail past QC and says QC: passed', async ($, on
   expect(seen.status.at(-1)).toBe('QC: passed')
 })
 
-test('a rising block count opens the pane by itself, once', async ($, on) => {
+test('a block does not open the pane by itself; the status says blocked', async ($, on) => {
   const seen = setup(on, { rows: [dirty] })
   await start($)
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
-  expect(seen.opened).toEqual(['workflow'])
+  expect(seen.opened).toEqual([])
   expect(seen.status.at(-1)).toBe('QC: blocked 1/3')
 })
 
-test('a teammate file adds a row; a malformed or stale one is ignored', async ($, on) => {
-  setup(on, { rows: [dirty], mates: [
-    { name: 'builder-1.json', body: JSON.stringify({ agent: 'builder-1', hit: 1, blocked: false, title: 'Fix it' }) },
+test('teammate files add no band rows; the tmux dots are still built; bad and stale files are skipped', async ($, on) => {
+  const seen = setup(on, { rows: [dirty], mates: [
+    { name: 'builder-1.json', body: JSON.stringify({ agent: 'builder-1', hit: 5, blocked: false }) },
+    { name: 'builder-2.json', body: JSON.stringify({ agent: 'builder-2', hit: 3, blocked: false }) },
     { name: 'bad.json', body: '{"agent":5}' },
     { name: 'old.json', mtimeMs: 1, body: JSON.stringify({ agent: 'old', hit: 1 }) },
   ] })
   await start($)
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
-  const rows = await bandText($)
-  expect(rows.some((r: string) => r.startsWith('builder-1') && r.includes('Fix it · Plan') && r.includes('Build ●'))).toBe(true)
-  expect(rows.some((r: string) => r.includes('old'))).toBe(false)
+  expect((await bandText($)).length).toBe(1) // the rail alone: no title, no teammate rows
+  const tmux = seen.runs.filter(a => a[0] === 'bash' && String(a[2]).includes('@wf_team')).at(-1)
+  expect(tmux?.at(-1)).toBe('● builder-1 ✓ ● builder-2 Q')
+})
+
+const wf = (seen: any) => seen.runs.filter((a: any[]) => a[0] === 'bash' && String(a[2]).includes('@wf_team'))
+const edit = ($: any) => $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
+
+test('an empty team writes nothing, and session end clears nothing', async ($, on) => {
+  const seen = setup(on, { rows: [dirty] })
+  on('session.end', (_: any, e: any) => ({ sessionId: 's1' }))
+  await start($)
+  await edit($)
+  await $.session.end({} as any)
+  expect(wf(seen).length).toBe(0)
+})
+
+test('a blocked teammate shows X; hostile names are made safe; unchanged dots write once; session end clears', async ($, on) => {
+  const seen = setup(on, { rows: [dirty], mates: [
+    { name: 'a.json', body: JSON.stringify({ agent: 'x#(rm)', hit: 3, blocked: true }) },
+    { name: 'b.json', body: JSON.stringify({ agent: 'ok-1', hit: 5, blocked: false }) },
+  ] })
+  on('session.end', (_: any, e: any) => ({ sessionId: 's1' }))
+  await start($)
+  await edit($)
+  await edit($)
+  await $.tool.call({ tool: 'TodoWrite' })
+  expect(wf(seen).length).toBe(1)
+  expect(wf(seen)[0].at(-1)).toBe('● x__rm_ ✗ ● ok-1 ✓')
+  await $.session.end({} as any)
+  expect(seen.runs.some((a: any[]) => String(a[2]).includes('set -gu @wf_team'))).toBe(true)
 })
 
 test('which prompts start a task, and what title they give', () => {
@@ -110,11 +139,4 @@ test('a subagent TaskCreate does not set the title', async ($, on) => {
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
   await $.tool.call({ tool: 'TaskCreate', subject: 'Sub', description: 'd', agentId: 'a1' } as any)
   expect((await bandText($))[0]).toBe('Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○')
-})
-
-test('teammate file without a title still renders a row', async ($, on) => {
-  setup(on, { rows: [dirty], mates: [{ name: 'b2.json', body: JSON.stringify({ agent: 'b2', hit: 2, blocked: false }) }] })
-  await start($)
-  await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
-  expect((await bandText($)).some((r: string) => r.startsWith('b2') && r.includes('Prove ●'))).toBe(true)
 })

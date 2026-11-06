@@ -13,3 +13,4 @@
 .claude/router
 .agents/skills
 .claude/dev-mods/workflow-rail
+.tmux/tmux.conf

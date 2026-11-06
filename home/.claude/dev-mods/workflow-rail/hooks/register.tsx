@@ -6,11 +6,10 @@ import type { Mate, Me, Qc, Title } from './state'
 // hit: -1 idle, 0 Plan, 1 Build, 2 Prove, 3 QC running, 4 QC passed, 5 Report done.
 const hit = atom({ plugin: 'workflow-rail', key: 'hit' } as const, -1)
 const qc = atom({ plugin: 'workflow-rail', key: 'qc' } as const, [] as Qc[], { shape: 'qc-1' })
-const mates = atom({ plugin: 'workflow-rail', key: 'mates' } as const, [] as Mate[], { shape: 'mates-1' })
 const me = atom({ plugin: 'workflow-rail', key: 'me' } as const, null as Me | null, { shape: 'me-1' })
-const blocksSeen = atom({ plugin: 'workflow-rail', key: 'blocksSeen' } as const, 0)
 
 const raise = (to: number) => (h: number) => Math.max(h, to)
+let lastDots = '' // what this session last wrote to @wf_team
 let lastRefresh = 0 // debounce only; a hot reload resetting it is harmless
 const title = atom({ plugin: 'workflow-rail', key: 'title' } as const, { text: '', byTask: false } as Title, { shape: 'title-1' })
 const clip = (t: string, n: number) => ([...t].length > n ? [...t].slice(0, n - 1).join('') + '…' : t)
@@ -74,9 +73,6 @@ async function refresh($: any, isForced = false) {
     const h = await read($, hit)
     if (h >= 1 && h < 5 && rows.some(x => x.lines > 0) && !isPending(rows) && rows.some(x => x.passed))
       await update($, hit, raise(4))
-    const total = rows.reduce((n, x) => n + (x.needs_gate ? x.blocks : 0), 0)
-    if (total > (await read($, blocksSeen))) void $.ui.open({ id: PANE, title: 'Workflow' })
-    await update($, blocksSeen, () => total)
   } catch {}
   await publish($)
 }
@@ -88,7 +84,7 @@ async function publish($: any) {
     const dir = await wfDir($)
     const who = await whoami($)
     if (who !== 'lead') {
-      await $.fs.write(`${dir}/${who.agent}.json`, JSON.stringify({ agent: who.agent, hit: h, blocked: isBlocked(q), title: (await read($, title)).text }))
+      await $.fs.write(`${dir}/${who.agent}.json`, JSON.stringify({ agent: who.agent, hit: h, blocked: isBlocked(q) }))
     } else {
       const found: Mate[] = []
       for (const f of await $.fs.list(dir).catch(() => [])) {
@@ -96,13 +92,18 @@ async function publish($: any) {
         if (f.mtimeMs && (await $.clock.now()) - f.mtimeMs > 30 * 60_000) continue // stale teammate
         try {
           const o = JSON.parse(await $.fs.read(`${dir}/${f.name}`))
-          if (o && typeof o.agent === 'string' && typeof o.hit === 'number') found.push({ agent: o.agent, hit: o.hit, blocked: o.blocked === true, ...(typeof o.title === 'string' ? { title: o.title } : {}) })
+          if (o && typeof o.agent === 'string' && typeof o.hit === 'number') found.push({ agent: o.agent, hit: o.hit, blocked: o.blocked === true })
         } catch {}
       }
-      await update($, mates, () => found)
-      const dots = found.map(m => `● ${m.agent} ${letter(m)}`).join(' ')
+      // names come from files and land in tmux status-right: no `#(` or `#[` may survive
+      const safe = (n: string) => n.replace(/[^\w.-]/g, '_').replace(/#/g, '##')
+      const dots = found.map(m => `● ${safe(m.agent)} ${letter(m)}`).join(' ')
       // tmux only when running; a user option the status line can show as #{@wf_team}
-      await $.process.run(['bash', '-c', '[ -n "$TMUX" ] && command -v tmux >/dev/null && tmux set -g @wf_team "$1"; true', 'x', dots])
+      // an empty team never overwrites another session's dots unless this session wrote some
+      if (dots !== lastDots && (dots !== '' || lastDots !== '')) {
+        lastDots = dots
+        await $.process.run(['bash', '-c', '[ -n "$TMUX" ] && command -v tmux >/dev/null && tmux set -g @wf_team "$1"; true', 'x', dots])
+      }
     }
     const bad = isBlocked(q)
     const pend = q.filter(r => r.needs_gate)
@@ -123,7 +124,6 @@ export const register: Register = on => {
     if (!isUserPrompt(e)) return next(e)
     await update($, hit, () => -1)
     await update($, title, () => ({ text: promptTitle(e), byTask: false }))
-    await update($, blocksSeen, () => 0)
     await publish($)
     return next(e)
   })
@@ -158,6 +158,14 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('session.end', async ($, e, next) => {
+    if (lastDots !== '') {
+      lastDots = ''
+      await $.process.run(['bash', '-c', '[ -n "$TMUX" ] && command -v tmux >/dev/null && tmux set -gu @wf_team; true']).catch(() => {})
+    }
+    return next(e)
+  })
+
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'workflow', description: 'Show the QC workflow pane' })
     return next(e)
@@ -173,15 +181,11 @@ export const register: Register = on => {
     if (lvl < 0) return next(e)
     const { Box, Text } = $.ui.resolve(e)
     const bad = isBlocked(await read($, qc))
-    const team = await read($, mates)
     const name = (await read($, title)).text
     return (
       <Box flexDirection="column">
         {name !== '' && <Text bold>{name}</Text>}
         <Text color={bad ? 'red' : undefined}>{rail(lvl, bad)}</Text>
-        {team.map(m => (
-          <Text dimColor>{m.agent.padEnd(12)} {m.title ? clip(m.title, 15) + ' · ' : ''}{rail(m.hit, m.blocked)}</Text>
-        ))}
       </Box>
     )
   })
