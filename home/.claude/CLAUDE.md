@@ -15,7 +15,8 @@
    - Test proxy, config or credential changes on a copy or alternate port first, never live.
 4. **QC before done.** Workflow is flexible (inline for small work, `/goal` or pstack for big), but QC is not: after code changes (10+ lines, docs excluded), spawn `reviewer` and `guardrail` in one message, fix confirmed findings, re-run `guardrail` until `VERDICT: PASS`, then report. The Stop hook `hooks/qc-gate.sh` enforces this and blocks finishing until it is done.
 5. **Consent for outward actions.** `git push`, `gh pr merge|ready`, PR comments and killing processes you did not start need the user's latest message to name that action and target. "Ship it" is not "merge". Before opening a PR or asking for re-review: fetch, rebase so the branch is 0 behind base, and read `git diff --stat origin/<base>` for stray files (gitlinks, worktrees). The PR body lists the commands run and their results.
-6. **Report like a human.** What changed, how it was verified, what was skipped, and any risk. No narration.
+6. **Learn from corrections.** When the user corrects you (the `hooks/correction-reflect.py` hook flags it), open with `Reflect: I did X; should have Y.`, fix it, then sharpen or add one rule here if the lesson is general.
+7. **Report like a human.** What changed, how it was verified, what was skipped, and any risk. No narration.
 
 Process skills from plugins (superpowers, pstack, postman) are tools, not mandates: use one when the task is multi-step, unclear, or is a bug with an unknown cause. Skip them for questions, single-file changes, and lookups.
 

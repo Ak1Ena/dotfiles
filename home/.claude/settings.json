@@ -397,6 +397,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I /Users/m129/.claude/hooks/correction-reflect.py",
+            "timeout": 5
+          }
+        ]
       }
     ]
   },

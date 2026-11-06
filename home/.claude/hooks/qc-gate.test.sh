@@ -128,6 +128,34 @@ ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
 
 [[ ! -d $HOME/.claude/work/t12b-$$ ]] && echo "PASS status creates no state dir" || { echo "FAIL status made state dir"; fails=$((fails+1)); }
 
+# 13. committing a new (untracked) file after PASS keeps the PASS
+R=$T/r13; newrepo "$R"; S=t13-$$
+ev $S "$R" baseline; track $S "$R" "$R/n.js"; seq 1 20 >"$R/n.js"
+echo doc >"$R/n.md"; head -c 3000 /dev/urandom >"$R/d.bin"  # excluded/binary files ride along in the commit
+ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
+(cd "$R" && git add -A && g commit -qm feat)
+check "commit of PASSed new file allows" allow "$(ev $S "$R" gate)"
+echo x >>"$R/n.js"
+check "edit after commit still blocks" block "$(ev $S "$R" gate)"
+R=$T/r13b; newrepo "$R"; S=t13b-$$; q=$'q"t\tb.js'
+ev $S "$R" baseline; seq 1 20 >"$R/$q"
+ev $S "$R" mark '{agent_type:"reviewer"}'; ev $S "$R" mark "$pass_msg"
+(cd "$R" && git add . && g commit -qm feat)
+check "commit of quoted-name file allows" allow "$(ev $S "$R" gate)"
+echo x >>"$R/$q"
+check "edit of quoted-name file blocks" block "$(ev $S "$R" gate)"
+
+# 14. lead is not blocked while its teammate is active; blocked again once idle
+R=$T/r14; newrepo "$R"; S=t14-$$; export QC_TEAMS_DIR=$T/teams; mkdir -p "$QC_TEAMS_DIR/x"
+team() { jq -nc --arg s "$1" --argjson a "$2" '{leadSessionId:$s,members:[{agentType:"team-lead"},{agentType:"builder",isActive:$a}]}' >"$QC_TEAMS_DIR/x/config.json"; }
+ev $S "$R" baseline; seq 1 20 >>"$R/a.js"
+team $S true;  check "active teammate allows lead stop" allow "$(ev $S "$R" gate)"
+team other true; check "other team's teammate does not count" block "$(ev $S "$R" gate)"
+team $S false; check "idle teammate blocks again" block "$(ev $S "$R" gate)"
+team $S true; touch -t 202001010000 "$QC_TEAMS_DIR/x/config.json"
+check "stale active flag blocks" block "$(ev $S "$R" gate)"
+unset QC_TEAMS_DIR
+
 echo "$fails failed (temp: $T)"
-for s in t1 t1b t1c t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
+for s in t1 t1b t1c t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b t13 t13b t14; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done
 exit $((fails > 0))

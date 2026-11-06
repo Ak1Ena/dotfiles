@@ -14,6 +14,7 @@ command -v jq >/dev/null || exit 0
 QC_MIN_LINES=${QC_MIN_LINES:-10}
 QC_MAX_BLOCKS=${QC_MAX_BLOCKS:-3}    # blocks per identical change before letting go (loop guard)
 QC_MAX_FILE=${QC_MAX_FILE:-1048576}  # untracked files above this size are data, not code
+QC_TEAMS_DIR=${QC_TEAMS_DIR:-$HOME/.claude/teams}
 EXCL=(':(exclude)*.md' ':(exclude)*.mdx' ':(exclude)*.txt' ':(exclude)*.rst'
       ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' ':(exclude)yarn.lock')
 EMPTY_TREE=4b825dc642cb6eb9a060e54bf8d69288fbee4904
@@ -56,7 +57,20 @@ measure() {  # prints "<hash> <changed code lines>" for the change since the sna
     new=$(untracked | sort | comm -13 "$state/$k.untracked" -)  # new or edited untracked files
     t=$(git diff "$b" --numstat -- . "${EXCL[@]}" | awk '$1!="-"{n+=$1+$2} END{print n+0}')
     u=0; while read -r _ f; do [[ -n $f ]] && u=$((u + $(wc -l <"$f"))); done <<<"$new"
-    h=$( { git diff "$b" --binary; echo "$new"; } | shasum | cut -c1-16)
+    # hash path+content, not diff text: committing a new file must not look like a new change
+    files=()
+    # tracked side uses the same filter as untracked() (EXCL, binary, size) so a commit moves files across unchanged
+    while IFS= read -r -d '' f; do [[ -n $f ]] && files+=("$f"); done < <(
+      { git diff "$b" --numstat --no-renames -z -- . "${EXCL[@]}" | while IFS= read -r -d '' rec; do
+          [[ ${rec%%$'\t'*} == - ]] && continue
+          f=${rec#*$'\t'}; f=${f#*$'\t'}
+          [[ -f $f && $(wc -c <"$f") -gt $QC_MAX_FILE ]] && continue
+          printf '%s\0' "$f"
+        done
+        [[ -n $new ]] && cut -d' ' -f2- <<<"$new" | tr '\n' '\0'; } | sort -zu)
+    h=$( { printf '%s\n' "${files[@]}"
+           for f in "${files[@]}"; do [[ -f $f ]] && printf '%s\n' "$f"; done | git hash-object --stdin-paths
+         } | shasum | cut -c1-16)
     echo "$h $((t + u))"
   )
 }
@@ -70,6 +84,17 @@ is_teammate() {  # teammates are verified by their lead's guardrail
     a=$(ps -o args= -p "$pid" 2>/dev/null)
     [[ $a == *--agent-id* ]] && return 0
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+  done
+  return 1
+}
+
+teammate_busy() {  # lead stops while a teammate still works: its edits are mid-flight, gate later
+  # only configs written in the last hour: a crashed teammate's stale isActive=true must not disable the gate
+  # shortcut: a teammate silent for >1h counts as idle, so the lead gets blocked; raise -mmin if that bites
+  local f
+  for f in "$QC_TEAMS_DIR"/*/config.json; do
+    [[ -n $(find "$f" -mmin -60 2>/dev/null) ]] || continue
+    jq -e --arg s "$sid" '.leadSessionId == $s and any(.members[]?; .isActive == true and .agentType != "team-lead")' "$f" >/dev/null 2>&1 && return 0
   done
   return 1
 }
@@ -132,6 +157,7 @@ status)  # read-only: feeds the workflow mod
 
 gate)
   is_teammate && exit 0
+  teammate_busy && exit 0
   problems="" notes=""
   while read -r r; do
     [[ -d $r ]] || continue
