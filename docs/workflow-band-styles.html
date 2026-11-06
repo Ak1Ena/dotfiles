@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow band styles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* layout: one column; picker bar on top, then a grid of terminal mocks, one per style, each showing four moments */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --ink: #1b2130; --muted: #5d6679; --line: #d9dde6;
+  --accent: #2f5bd3; --pass: #1f8a4c;
+  --term-bg: #12151d; --term-ink: #d7dbe4; --term-dim: #7c8496;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10131a; --surface: #171b24; --ink: #e4e7ee; --muted: #9aa3b5; --line: #2a3040;
+    --accent: #7c9cff; --pass: #4cc07f; --term-bg: #0a0c11; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10131a; --surface: #171b24; --ink: #e4e7ee; --muted: #9aa3b5; --line: #2a3040;
+  --accent: #7c9cff; --pass: #4cc07f; --term-bg: #0a0c11; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--font-body); }
+main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 28px; }
+h1 { font-size: 2rem; font-weight: 600; margin: 0; text-wrap: balance; line-height: 1.2; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 68ch; margin-top: 8px; }
+code { font-family: var(--font-mono); font-size: 0.86em; }
+.bar { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; }
+.toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggles span.k { color: var(--muted); font-size: 0.9rem; }
+.choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.choice code { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; overflow-wrap: anywhere; }
+#copy { font: 600 0.9rem var(--font-body); padding: 8px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+:root[data-theme="dark"] #copy { color: #0a0c11; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #copy { color: #0a0c11; } }
+#copied { color: var(--muted); font-size: 0.9rem; }
+input { accent-color: var(--accent); }
+input:focus-visible, #copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.styles { display: grid; gap: 18px; }
+.style { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
+.style:has(input:checked) { border-color: var(--accent); }
+.style header { display: flex; gap: 12px; align-items: flex-start; }
+.style header label { display: grid; gap: 2px; cursor: pointer; flex: 1; }
+.style header b { font-weight: 600; }
+.style header small { color: var(--muted); font-size: 0.9rem; }
+.badge { font: 600 0.75rem var(--font-body); color: var(--pass); border: 1px solid currentColor; border-radius: 999px; padding: 1px 9px; margin-left: 8px; white-space: nowrap; }
+.id { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+.term { background: var(--term-bg); color: var(--term-ink); border-radius: 8px; font: 13px/1.5 var(--font-mono); overflow-x: auto; border: 1px solid #000; }
+.screen { width: 100ch; padding: 8px 14px 12px; display: grid; gap: 2px; }
+.cap { color: #5b6275; margin-top: 8px; }
+.cap:first-child { margin-top: 0; }
+.row { display: flex; gap: 3ch; justify-content: space-between; white-space: pre; }
+.box { border: 1px solid #5b6275; border-radius: 6px; padding: 0 1ch; }
+.box.blocked { border-color: #ff7a7a; }
+.box.passed { border-color: #4cc07f; }
+.prompt { border: 1px solid #3a4256; border-radius: 6px; padding: 0 1ch; color: var(--term-dim); margin-top: 2px; white-space: pre; }
+.b { font-weight: 700; } .dim { color: #7c8496; }
+.ok { color: #4cc07f; } .bad { color: #ff7a7a; } .cur { color: #56d4e0; font-weight: 700; } .pend { color: #5b6275; } .wait { color: #e8b04f; }
+.pill-ok { background: #1d4a33; color: #8ee2b3; } .pill-cur { background: #56d4e0; color: #0a0c11; font-weight: 700; }
+.pill-bad { background: #ff7a7a; color: #0a0c11; font-weight: 700; } .pill-pend { color: #5b6275; }
+.chip-wait { background: #e8b04f; color: #0a0c11; } .chip-bad { background: #ff7a7a; color: #0a0c11; } .chip-ok { background: #4cc07f; color: #0a0c11; }
+.notes { display: grid; gap: 6px; color: var(--muted); font-size: 0.93rem; max-width: 80ch; }
+.notes h2 { font-size: 1.1rem; color: var(--ink); margin: 0; }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Workflow band styles</h1>
+    <p class="lede">Pick a band style. Each preview is what Claude Code will draw above your prompt, in four moments: building, QC blocked, passed, and with teammates. Previews use the same text, colors and boxes the plugin can draw.</p>
+  </div>
+
+  <div class="bar" role="group" aria-label="Your choice">
+    <div class="toggles">
+      <label><input type="checkbox" id="chip" checked> <span>Show QC chip</span></label>
+      <label><input type="checkbox" id="title" checked> <span>Show task title</span></label>
+    </div>
+    <div class="choice">
+      <code id="choice"></code>
+      <button type="button" id="copy">Copy choice</button>
+      <span id="copied" role="status"></span>
+    </div>
+  </div>
+
+  <div class="styles" id="styles"></div>
+
+  <div class="notes">
+    <h2>Why color rail</h2>
+    <p>Color rail keeps today's two-line layout and only adds color, so it needs no extra width, never wraps oddly in a narrow pane, and the red ✗ is the first thing you see when QC blocks.</p>
+  </div>
+</main>
+<script>
+const STAGES = ["Plan", "Build", "Prove", "QC", "Report"];
+const TITLE = "Add task title to workflow band";
+const MOMENTS = [
+  { name: "Building", st: ["done","cur","pend","pend","pend"], n: 2, chip: ["wait", "QC: 41 lines unreviewed", "41 unreviewed"] },
+  { name: "QC blocked", st: ["done","done","done","bad","pend"], n: 4, chip: ["bad", "QC: blocked 1/3", "blocked 1/3"] },
+  { name: "Passed", st: ["done","done","done","done","cur"], n: 5, chip: ["ok", "QC: passed", "passed"] },
+];
+const MATES = [
+  { who: "builder-1", t: "Fix upload retry", st: ["done","done","cur","pend","pend"], n: 3 },
+  { who: "reviewer-1", t: "Review upload retry", st: ["done","done","done","cur","pend"], n: 4 },
+];
+const GL = { done: "✓", cur: "●", pend: "○", bad: "✗" };
+const sp = (c, t) => `<span class="${c}">${t}</span>`;
+const curName = m => STAGES[m.st.findIndex(s => s === "cur" || s === "bad")] || "Report";
+const barColor = m => m.st.includes("bad") ? "bad" : m.n === 5 ? "ok" : "cur";
+const dot = " " + sp("dim", "·") + " ";
+const railColor = m => STAGES.map((s, i) => sp(m.st[i] === "cur" ? "cur" : m.st[i] === "done" ? "ok" : m.st[i] === "bad" ? "bad" : "pend", s + " " + GL[m.st[i]])).join(dot);
+const railPlain = m => sp("dim", STAGES.map((s, i) => s + " " + GL[m.st[i]]).join(" · "));
+const pills = m => STAGES.map((s, i) => sp("pill-" + m.st[i], " " + s + (m.st[i] === "done" ? " ✓" : m.st[i] === "bad" ? " ✗" : "") + " ")).join(" ");
+const bar = (m, w) => { const f = Math.round(m.n / 5 * w); return sp(barColor(m), "━".repeat(f)) + sp("pend", "─".repeat(w - f)); };
+const chipHtml = (m, o, short) => o.chip ? sp("chip-" + m.chip[0], " " + (short ? m.chip[2] : m.chip[1]) + " ") : "";
+const row = (l, r) => `<div class="row"><span>${l}</span><span>${r || ""}</span></div>`;
+
+const STYLES = {
+  rail: { name: "Color rail", rec: true, desc: "Today's two lines, but done is green, current is bold cyan, pending is dim, blocked is red. Chip sits right.",
+    band: (m, o) => (o.title ? row(sp("dim", "▍ ") + sp("b", TITLE), chipHtml(m, o)) : "") + row(railColor(m), o.title ? "" : chipHtml(m, o)),
+    mate: (t, o) => row(sp("dim", t.who.padEnd(11) + t.t + " · ") + railColor(t)) },
+  card: { name: "Card", desc: "Rounded box. Title top left, stage count top right, rail inside, chip on its own line.",
+    band: (m, o) => `<div class="box ${m.st.includes("bad") ? "blocked" : m.n === 5 ? "passed" : ""}">` + row(o.title ? sp("b", TITLE) : sp("dim", "Workflow"), sp(barColor(m), m.n + "/5")) + row(railColor(m)) + (o.chip ? row(chipHtml(m, o)) : "") + "</div>",
+    mate: (t, o) => `<div class="box">` + row(sp("dim", t.who + "  " + t.t), sp("cur", t.n + "/5")) + "</div>" },
+  seg: { name: "Segments", desc: "Each stage is a filled pill. Current stage is bright, done stages are muted green, blocked is solid red.",
+    band: (m, o) => (o.title ? row(sp("b", TITLE)) : "") + row(pills(m), chipHtml(m, o)),
+    mate: (t, o) => row(sp("dim", t.who.padEnd(11) + t.t + "  ") + pills(t)) },
+  line: { name: "Progress line", desc: "One compact line: accent, title, a progress bar, current stage and count, QC summary.",
+    band: (m, o) => row(sp("dim", "▍ ") + (o.title ? sp("b", TITLE) + "   " : "") + bar(m, 14) + " " + sp(barColor(m), curName(m) + " " + m.n + "/5"), o.chip ? sp(m.chip[0] === "ok" ? "ok" : m.chip[0], "QC " + m.chip[2]) : ""),
+    mate: (t, o) => row(sp("dim", t.who.padEnd(11) + t.t.padEnd(22)) + bar(t, 8) + " " + sp("cur", curName(t) + " " + t.n + "/5")) },
+  min: { name: "Minimal", desc: "Dim title, and only the current stage in color. Quietest option.",
+    band: (m, o) => (o.title ? row(sp("dim", TITLE)) : "") + row(sp(barColor(m), curName(m) + " " + m.n + "/5") + (o.chip ? sp("dim", " · ") + sp(m.chip[0] === "ok" ? "ok" : m.chip[0], m.chip[1]) : "")),
+    mate: (t, o) => row(sp("dim", t.who.padEnd(11) + t.t + " · ") + sp("cur", curName(t))) },
+};
+
+const $ = id => document.getElementById(id);
+const opts = () => ({ chip: $("chip").checked, title: $("title").checked });
+const sel = () => document.querySelector('input[name="style"]:checked').value;
+
+function mock(s, o) {
+  let h = "";
+  MOMENTS.forEach(m => { h += sp("cap", m.name) + s.band(m, o) + `<div class="prompt">&gt; </div>`; });
+  h += sp("cap", "With teammates") + s.band(MOMENTS[0], o) + MATES.map(t => s.mate(t, o)).join("") + `<div class="prompt">&gt; </div>`;
+  return `<div class="term"><div class="screen">${h}</div></div>`;
+}
+function render() {
+  const o = opts();
+  document.querySelectorAll("[data-mock]").forEach(el => { el.innerHTML = mock(STYLES[el.dataset.mock], o); });
+  $("choice").textContent = `Band style: ${sel()}, chip=${o.chip ? "on" : "off"}, title=${o.title ? "on" : "off"}`;
+}
+$("styles").innerHTML = Object.entries(STYLES).map(([id, s], i) => `
+  <section class="style"><header>
+    <input type="radio" name="style" id="r-${id}" value="${id}" ${i === 0 ? "checked" : ""}>
+    <label for="r-${id}"><span><b>${s.name}</b>${s.rec ? '<span class="badge">Recommended</span>' : ""} <span class="id">${id}</span></span><small>${s.desc}</small></label>
+  </header><div data-mock="${id}"></div></section>`).join("");
+document.querySelectorAll("input").forEach(i => i.addEventListener("change", render));
+$("copy").addEventListener("click", async () => {
+  const msg = $("copied"), text = $("choice").textContent;
+  try { await navigator.clipboard.writeText(text); msg.textContent = "Copied"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("choice")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); msg.textContent = "Press Cmd+C to copy"; }
+});
+render();
+</script>
+</body>
+</html>

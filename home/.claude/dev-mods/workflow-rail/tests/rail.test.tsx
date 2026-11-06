@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
+import { isUserPrompt, promptTitle } from '../hooks/register'
+
 const BAND = { plugin: 'workflow-rail', component: 'AbovePrompt', requestId: 'b', surface: 'terminal', props: { bodyColumns: 80 } } as const
 const PANE = { plugin: 'workflow-rail', component: 'Pane', requestId: 'workflow', surface: 'terminal',
   props: { title: 'Workflow', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} } } as const
@@ -63,13 +65,56 @@ test('a rising block count opens the pane by itself, once', async ($, on) => {
 
 test('a teammate file adds a row; a malformed or stale one is ignored', async ($, on) => {
   setup(on, { rows: [dirty], mates: [
-    { name: 'builder-1.json', body: JSON.stringify({ agent: 'builder-1', hit: 1, blocked: false }) },
+    { name: 'builder-1.json', body: JSON.stringify({ agent: 'builder-1', hit: 1, blocked: false, title: 'Fix it' }) },
     { name: 'bad.json', body: '{"agent":5}' },
     { name: 'old.json', mtimeMs: 1, body: JSON.stringify({ agent: 'old', hit: 1 }) },
   ] })
   await start($)
   await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
   const rows = await bandText($)
-  expect(rows.some((r: string) => r.startsWith('builder-1') && r.includes('Build ●'))).toBe(true)
+  expect(rows.some((r: string) => r.startsWith('builder-1') && r.includes('Fix it · Plan') && r.includes('Build ●'))).toBe(true)
   expect(rows.some((r: string) => r.includes('old'))).toBe(false)
+})
+
+test('which prompts start a task, and what title they give', () => {
+  expect(isUserPrompt({ origin: { kind: 'composer' } })).toBe(true)
+  expect(isUserPrompt({ origin: { kind: 'sdk' } })).toBe(true)
+  for (const o of ['task-notification', 'peer', 'scheduled-trigger', 'plugin']) expect(isUserPrompt({ origin: { kind: o } })).toBe(false)
+  expect(isUserPrompt({ origin: { kind: 'composer' }, isMeta: true })).toBe(false)
+  expect(isUserPrompt({})).toBe(false)
+  expect(promptTitle({ text: '\n  Add   a title\n more' })).toBe('Add a title')
+  expect(promptTitle({ text: '/workflow', command: { name: 'workflow' } })).toBe('')
+  expect(promptTitle({ text: 'x'.repeat(80) })).toBe('x'.repeat(59) + '…')
+  expect([...promptTitle({ text: '😀'.repeat(80) })].length).toBe(60)
+})
+
+test('TaskCreate sets the title once; a plugin-origin prompt (the harness only sends that) keeps title and rail', async ($, on) => {
+  on('prompt.submit', (_: any, e: any) => ({ text: e.text }))
+  setup(on, { rows: [dirty] })
+  await start($)
+  await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
+  await $.tool.call({ tool: 'TaskCreate', subject: 'Real task', description: 'd' })
+  await $.tool.call({ tool: 'TaskCreate', subject: 'Second task', description: 'd' })
+  const before = await bandText($)
+  expect(before[0]).toBe('Real task')
+  await $.prompt.submit({ text: 'subagent done' })
+  expect(await bandText($)).toEqual(before)
+  const p = await $.ui.mount(PANE)
+  expect((await p.find({ type: 'Text', text: /Real task/ }))?.text).toBe('Real task')
+  await p.unmount()
+})
+
+test('a subagent TaskCreate does not set the title', async ($, on) => {
+  setup(on, { rows: [dirty] })
+  await start($)
+  await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
+  await $.tool.call({ tool: 'TaskCreate', subject: 'Sub', description: 'd', agentId: 'a1' } as any)
+  expect((await bandText($))[0]).toBe('Plan ✓ · Build ● · Prove ○ · QC ○ · Report ○')
+})
+
+test('teammate file without a title still renders a row', async ($, on) => {
+  setup(on, { rows: [dirty], mates: [{ name: 'b2.json', body: JSON.stringify({ agent: 'b2', hit: 2, blocked: false }) }] })
+  await start($)
+  await $.tool.call({ tool: 'Edit', file_path: '/r/x/a.js' })
+  expect((await bandText($)).some((r: string) => r.startsWith('b2') && r.includes('Prove ●'))).toBe(true)
 })

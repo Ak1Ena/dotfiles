@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Mate, Me, Qc } from './state'
+import type { Mate, Me, Qc, Title } from './state'
 
 // hit: -1 idle, 0 Plan, 1 Build, 2 Prove, 3 QC running, 4 QC passed, 5 Report done.
 const hit = atom({ plugin: 'workflow-rail', key: 'hit' } as const, -1)
@@ -12,6 +12,11 @@ const blocksSeen = atom({ plugin: 'workflow-rail', key: 'blocksSeen' } as const,
 
 const raise = (to: number) => (h: number) => Math.max(h, to)
 let lastRefresh = 0 // debounce only; a hot reload resetting it is harmless
+const title = atom({ plugin: 'workflow-rail', key: 'title' } as const, { text: '', byTask: false } as Title, { shape: 'title-1' })
+const clip = (t: string, n: number) => ([...t].length > n ? [...t].slice(0, n - 1).join('') + '…' : t)
+export const isUserPrompt = (e: any) => !e.isMeta && ['composer', 'bridge', 'sdk'].includes(e.origin?.kind)
+export const promptTitle = (e: any) =>
+  clip(e.command ? '' : (String(e.text).split('\n').map(l => l.trim()).find(Boolean) ?? '').replace(/\s+/g, ' '), 60)
 const STAGES = ['Plan', 'Build', 'Prove', 'QC', 'Report']
 const PANE = 'workflow'
 const MAX_BLOCKS = 3 // qc-gate.sh QC_MAX_BLOCKS default
@@ -83,7 +88,7 @@ async function publish($: any) {
     const dir = await wfDir($)
     const who = await whoami($)
     if (who !== 'lead') {
-      await $.fs.write(`${dir}/${who.agent}.json`, JSON.stringify({ agent: who.agent, hit: h, blocked: isBlocked(q) }))
+      await $.fs.write(`${dir}/${who.agent}.json`, JSON.stringify({ agent: who.agent, hit: h, blocked: isBlocked(q), title: (await read($, title)).text }))
     } else {
       const found: Mate[] = []
       for (const f of await $.fs.list(dir).catch(() => [])) {
@@ -91,7 +96,7 @@ async function publish($: any) {
         if (f.mtimeMs && (await $.clock.now()) - f.mtimeMs > 30 * 60_000) continue // stale teammate
         try {
           const o = JSON.parse(await $.fs.read(`${dir}/${f.name}`))
-          if (o && typeof o.agent === 'string' && typeof o.hit === 'number') found.push({ agent: o.agent, hit: o.hit, blocked: o.blocked === true })
+          if (o && typeof o.agent === 'string' && typeof o.hit === 'number') found.push({ agent: o.agent, hit: o.hit, blocked: o.blocked === true, ...(typeof o.title === 'string' ? { title: o.title } : {}) })
         } catch {}
       }
       await update($, mates, () => found)
@@ -114,7 +119,10 @@ async function publish($: any) {
 export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
+    // Only the person's own prompt starts a task; a subagent report or peer message must not wipe the band.
+    if (!isUserPrompt(e)) return next(e)
     await update($, hit, () => -1)
+    await update($, title, () => ({ text: promptTitle(e), byTask: false }))
     await update($, blocksSeen, () => 0)
     await publish($)
     return next(e)
@@ -130,6 +138,8 @@ export const register: Register = on => {
     else if (tool === 'Agent' && /^(.*:)?(reviewer|guardrail)$/.test(String(x.subagent_type ?? ''))) to = 3
     if (to >= 0 && !x.agentId) await update($, hit, raise(to))
     const ran = await next(e)
+    if (ran.deny === undefined && tool === 'TaskCreate' && !x.agentId && typeof x.subject === 'string' && x.subject.trim() && !(await read($, title)).byTask)
+      await update($, title, () => ({ text: clip(x.subject.trim().replace(/\s+/g, ' '), 60), byTask: true }))
     if (to === 1 || to === 3) await refresh($)
     else if (to >= 0) await publish($)
     return ran
@@ -164,11 +174,13 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const bad = isBlocked(await read($, qc))
     const team = await read($, mates)
+    const name = (await read($, title)).text
     return (
       <Box flexDirection="column">
+        {name !== '' && <Text bold>{name}</Text>}
         <Text color={bad ? 'red' : undefined}>{rail(lvl, bad)}</Text>
         {team.map(m => (
-          <Text dimColor>{m.agent.padEnd(12)} {rail(m.hit, m.blocked)}</Text>
+          <Text dimColor>{m.agent.padEnd(12)} {m.title ? clip(m.title, 15) + ' · ' : ''}{rail(m.hit, m.blocked)}</Text>
         ))}
       </Box>
     )
@@ -178,8 +190,10 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const q = await read($, qc)
     const lvl = await read($, hit)
+    const name = (await read($, title)).text
     return (
       <Box flexDirection="column">
+        {name !== '' && <Text bold>{name}</Text>}
         <Text bold>{lvl < 0 ? 'No task started' : rail(lvl, isBlocked(q))}</Text>
         {q.length === 0 && <Text dimColor>No repo tracked yet.</Text>}
         {q.map(r => (
