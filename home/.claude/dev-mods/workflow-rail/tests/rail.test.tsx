@@ -62,9 +62,12 @@ test('a block does not open the pane by itself; the status says blocked', async 
   expect(seen.opened).toEqual([])
   expect(seen.status.at(-1)).toBe('QC: blocked 1/3')
   const ui = await $.ui.mount(BAND)
-  const red = ((await ui.findAll?.({ type: 'Text' })) ?? []).filter((t: any) => t?.props?.color === 'red').map((t: any) => t.text)
+  const colored = ((await ui.findAll?.({ type: 'Text' })) ?? []).filter((t: any) => t?.props?.color)
+  const red = colored.filter((t: any) => t.props.color === 'red').map((t: any) => t.text)
   await ui.unmount()
   expect(red).toEqual(['Build ●']) // blocked before QC: the current stage turns red
+  expect(colored.filter((t: any) => t.props.color === 'green').map((t: any) => t.text)).toEqual(['Plan ✓'])
+  expect(colored.filter((t: any) => t.props.color === 'cyan')).toEqual([]) // current is red, not cyan, while blocked
 })
 
 test('teammate files add no band rows; the tmux dots are still built; bad and stale files are skipped', async ($, on) => {

@@ -187,7 +187,7 @@ export const register: Register = on => {
       const m = mark(i, lvl, bad)
       const label = `${STAGES[i]} ${m}`
       return m === '✓' ? <Text color="green">{label}</Text>
-        : m === '✗' || (bad && m === '●') ? <Text color="red" bold>{label}</Text> // a block before QC still shows red
+        : m === '✗' || (bad && m === '●' && lvl < 3) ? <Text color="red" bold>{label}</Text> // a block before QC still shows red
         : m === '●' ? <Text color="cyan" bold>{label}</Text>
         : <Text dimColor>{label}</Text>
     }
