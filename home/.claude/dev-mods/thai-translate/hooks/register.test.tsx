@@ -1,9 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-const MSG = (text: string) => ({
+const MSG = (text: string, id = 'msg-1') => ({
   plugin: 'thai-translate',
   component: 'AssistantMessage',
-  requestId: 'msg-1',
+  requestId: id,
   surface: 'terminal',
   props: { text, isFirstOfReply: true },
 }) as never
@@ -14,6 +14,7 @@ const engine = (on: any, calls: string[]) => {
   on('ui.status', () => ({ value: undefined }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('prompt.submit', (_: unknown, e: any) => ({ text: e.text }))
+  on('turn.complete', (_: unknown, e: any) => ({ text: e.answer }))
   // Google gtx: answers its JSON shape; 'Boom.' and 'Haiku.' fail with 429
   on('http.fetch', (_: unknown, e: any) => {
     const src = decodeURIComponent(e.init.body.slice(2))
@@ -52,7 +53,7 @@ test('/thai on: Thai prompt is sent in English, English prompt untouched', async
   expect(calls.length).toBe(1)
 })
 
-test('/thai on: reply shows in Thai once translated; /thai off shows English', async ($, on) => {
+const setup = async ($: any, on: any) => {
   const calls: string[] = []
   engine(on, calls)
   const clock = mock.clock(on)
@@ -61,15 +62,22 @@ test('/thai on: reply shows in Thai once translated; /thai off shows English', a
     const { Text } = $.ui.resolve(e)
     return <Text>{e.props.text}</Text>
   })
-  const shown = async (text: string) => {
-    const ui = await $.ui.mount(MSG(text))
+  const shown = async (text: string, id = 'msg-1') => {
+    const ui = await $.ui.mount(MSG(text, id))
     const t = (await ui.find({ type: 'Text' } as never))?.text
     await ui.unmount()
     return t
   }
+  const end = (answer: string) => $.turn.complete({ answer, durationMs: 1, isAborted: false, turnId: 't', reason: 'answer' } as never)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'thai', args: '' } as never)
+  return { calls, clock, shown, end }
+}
+
+test('/thai on: final reply shows in Thai once translated; /thai off shows English', async ($, on) => {
+  const { calls, clock, shown, end } = await setup($, on)
   expect(await shown('Done.')).toBe('Done.')
+  await end('Done.')
   await clock.advance(3000)
   expect(await shown('Done.')).toBe('เสร็จแล้ว')
   await $.command.run({ command: 'thai', args: '' } as never)
@@ -77,53 +85,38 @@ test('/thai on: reply shows in Thai once translated; /thai off shows English', a
   expect(calls.length).toBe(1)
 })
 
-test('streaming block: only the settled text is translated; a failure is not retried on redraw', async ($, on) => {
-  const calls: string[] = []
-  engine(on, calls)
-  const clock = mock.clock(on)
-  on('ui.render', ($: any, e: any) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text>{e.props.text}</Text>
-  })
-  const draw = async (text: string) => (await $.ui.mount(MSG(text))).unmount()
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'thai', args: '' } as never)
-  await draw('Do')
-  await clock.advance(500)
-  await draw('Done.')
+test('text between tool calls stays English; only the final message is translated, once', async ($, on) => {
+  const { calls, clock, shown, end } = await setup($, on)
+  await shown('Let me check the file.', 'mid')
+  await clock.advance(3000)
+  expect(calls).toEqual([])
+  await shown('Do', 'final')
+  await end('Done.')
+  await shown('Done.', 'final') // last words land after the turn ends: queued once they match the answer
   await clock.advance(3000)
   expect(calls).toEqual(['Done.'])
-  await draw('Boom.')
+  expect(await shown('Let me check the file.', 'mid')).toBe('Let me check the file.')
+  await $.prompt.submit({ text: 'next' } as never)
+  await shown('Boom.', 'f2')
+  await end('Boom.')
   await clock.advance(3000)
-  await draw('Boom.')
+  await end('Boom.')
   await clock.advance(3000)
   expect(calls).toEqual(['Done.', 'Boom.', 'haiku:Boom.'])
 })
 
 test('Google fails: haiku fallback; fenced code is never sent to Google', async ($, on) => {
-  const calls: string[] = []
-  engine(on, calls)
-  const clock = mock.clock(on)
-  on('ui.render', ($: any, e: any) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text>{e.props.text}</Text>
-  })
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'thai', args: '' } as never)
+  const { calls, clock, shown, end } = await setup($, on)
   expect(((await $.prompt.submit({ text: 'สวัสดี ช่วยแก้บั๊ก' } as never)) as any).text).toBe('Hello, help fix the bug')
   expect(calls).toEqual(['สวัสดี ช่วยแก้บั๊ก'])
-  const shown = async (text: string) => {
-    const ui = await $.ui.mount(MSG(text))
-    const t = (await ui.find({ type: 'Text' } as never))?.text
-    await ui.unmount()
-    return t
-  }
-  await shown('Haiku.')
+  await shown('Haiku.', 'a')
+  await end('Haiku.')
   await clock.advance(3000)
-  expect(await shown('Haiku.')).toBe('จากไฮกุ')
+  expect(await shown('Haiku.', 'a')).toBe('จากไฮกุ')
   const md = '# Run it\n\n```sh\nls -la\n```\n\nDone.\n\n```sh\ncut off'
-  await shown(md)
+  await shown(md, 'b')
+  await end(md)
   await clock.advance(3000)
-  expect(await shown(md)).toBe('# TH(Run it)\n\n```sh\nls -la\n```\n\nเสร็จแล้ว\n\n```sh\ncut off')
+  expect(await shown(md, 'b')).toBe('# TH(Run it)\n\n```sh\nls -la\n```\n\nเสร็จแล้ว\n\n```sh\ncut off')
   expect(calls.slice(-2)).toEqual(['Run it', 'Done.'])
 })

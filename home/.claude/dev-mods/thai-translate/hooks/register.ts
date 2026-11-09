@@ -105,6 +105,8 @@ async function pump($: EngineInterface, queue: Map<string, Queued>, tried: Set<s
 export const register: Register = on => {
   const queue = new Map<string, Queued>() // message id -> newest text, waiting to settle
   const tried = new Set<string>() // texts already sent for translation
+  const seen = new Map<string, string>() // message id -> latest text drawn
+  let final = '' // the last main-loop turn's final message text
   const busy = { on: false, warned: false }
   let timer: { cancel: () => void } | undefined
 
@@ -127,6 +129,11 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    if (!e.isMeta && !e.command) {
+      // a new turn: its mid-turn text must not match the last turn's answer, nor old blocks this one's
+      final = ''
+      seen.clear()
+    }
     if (e.command || e.isMeta || !THAI.test(e.text) || !(await read($, isOn))) return next(e)
     const out = await toLang($, e.text, 'th', 'en', TO_EN)
     if (!out) {
@@ -136,15 +143,32 @@ export const register: Register = on => {
     return next({ ...e, text: out })
   })
 
+  // Only a turn's final message is translated, not the text written between tool calls:
+  // a block is part of it when its text is inside the main loop's `answer`.
+  const enqueue = (id: string, text: string) => {
+    const t = text.trim()
+    if (final && t && final.includes(t) && eligible(text) && !tried.has(text)) queue.set(id, { text, ticks: 0 })
+  }
+  on('turn.complete', async ($, e, next) => {
+    if (!e.agentId && !e.isAborted && (await read($, isOn))) {
+      final = e.answer.trim()
+      for (const [id, text] of seen) enqueue(id, text) // blocks drawn after this are caught in ui.render
+    }
+    return next(e)
+  })
+
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     const text = e.props.text
-    if (!/[A-Za-z]/.test(text) || THAI.test(text) || text.length > MAX_CHARS || !(await read($, isOn))) return next(e)
+    if (e.props.isSummary || !(await read($, isOn))) return next(e)
+    seen.set(e.requestId, text)
+    if (seen.size > 200) seen.delete(seen.keys().next().value!)
+    if (!eligible(text)) return next(e)
     const done = (await read($, thai))[text]
     if (done) return next({ ...e, props: { ...e.props, text: done } })
-    // off-screen blocks wait until scrolled into view, so toggling on doesn't translate the whole transcript
-    if (e.props.onScreen === null || tried.has(text)) return next(e)
-    // shows English until the timer translates it, then the atom write redraws
-    if (queue.get(e.requestId)?.text !== text) queue.set(e.requestId, { text, ticks: 0 })
+    // a final-message block drawn (or still changing) after the turn ended restarts its settle count
+    if (queue.get(e.requestId)?.text !== text) enqueue(e.requestId, text)
     return next(e)
   })
 }
+
+const eligible = (text: string) => /[A-Za-z]/.test(text) && !THAI.test(text) && text.length <= MAX_CHARS
