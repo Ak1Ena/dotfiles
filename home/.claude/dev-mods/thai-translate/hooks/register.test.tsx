@@ -70,7 +70,7 @@ test('/thai on: reply shows in Thai once translated; /thai off shows English', a
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'thai', args: '' } as never)
   expect(await shown('Done.')).toBe('Done.')
-  await clock.advance(2000)
+  await clock.advance(3000)
   expect(await shown('Done.')).toBe('เสร็จแล้ว')
   await $.command.run({ command: 'thai', args: '' } as never)
   expect(await shown('Done.')).toBe('Done.')
@@ -91,12 +91,12 @@ test('streaming block: only the settled text is translated; a failure is not ret
   await draw('Do')
   await clock.advance(500)
   await draw('Done.')
-  await clock.advance(2000)
+  await clock.advance(3000)
   expect(calls).toEqual(['Done.'])
   await draw('Boom.')
-  await clock.advance(2000)
+  await clock.advance(3000)
   await draw('Boom.')
-  await clock.advance(2000)
+  await clock.advance(3000)
   expect(calls).toEqual(['Done.', 'Boom.', 'haiku:Boom.'])
 })
 
@@ -119,11 +119,11 @@ test('Google fails: haiku fallback; fenced code is never sent to Google', async 
     return t
   }
   await shown('Haiku.')
-  await clock.advance(2000)
+  await clock.advance(3000)
   expect(await shown('Haiku.')).toBe('จากไฮกุ')
   const md = '# Run it\n\n```sh\nls -la\n```\n\nDone.\n\n```sh\ncut off'
   await shown(md)
-  await clock.advance(2000)
+  await clock.advance(3000)
   expect(await shown(md)).toBe('# TH(Run it)\n\n```sh\nls -la\n```\n\nเสร็จแล้ว\n\n```sh\ncut off')
   expect(calls.slice(-2)).toEqual(['Run it', 'Done.'])
 })

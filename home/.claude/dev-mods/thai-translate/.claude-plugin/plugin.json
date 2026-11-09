@@ -1,1 +1,1 @@
-{"name":"thai-translate","version":"0.1.0","description":"Thai prompts go to Claude in English; Claude's English replies are shown in Thai. Toggle with /thai.","types":"./types/index.d.ts"}
+{"name":"thai-translate","version":"0.1.1","description":"Thai prompts go to Claude in English; Claude's English replies are shown in Thai. Toggle with /thai.","types":"./types/index.d.ts"}

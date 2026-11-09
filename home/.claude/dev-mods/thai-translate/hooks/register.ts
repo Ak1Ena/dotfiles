@@ -9,7 +9,8 @@ const thai = atom({ plugin: 'thai-translate', key: 'thai' } as const, {} as Thai
 
 export const THAI = /[฀-๿]/
 const STATUS = 'TH⇄EN on'
-const SETTLE_MS = 1500 // wait for a streaming block to stop changing before translating
+const TICK_MS = 750
+const SETTLE_TICKS = 3 // a streaming block must stay unchanged ~1.5-2s before it is translated
 // shortcut: blocks longer than this stay English (haiku fallback would hit maxTokens); raise if users hit it
 const MAX_CHARS = 12000
 const GOOGLE = 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t'
@@ -73,24 +74,47 @@ async function toLang($: EngineInterface, text: string, sl: string, tl: string, 
   return r.isAnswered ? r.text.trim() : ''
 }
 
-async function translate($: EngineInterface, latest: Map<string, string>, tried: Set<string>, id: string, text: string) {
-  await $.clock.sleep(SETTLE_MS)
-  if (latest.get(id) !== text || tried.has(text) || !(await read($, isOn))) return
-  latest.delete(id)
-  tried.add(text) // one attempt per text: a failure is not retried on every redraw
-  const out = await toLang($, text, 'en', 'th', TO_TH)
-  if (out) await update($, thai, m => ({ ...m, [text]: out }))
+type Queued = { text: string; ticks: number }
+
+// One timer tick: a block unchanged for SETTLE_TICKS ticks (done streaming) is translated.
+// Runs from a session timer because work a render hook leaves running is cut off when its dispatch ends.
+async function pump($: EngineInterface, queue: Map<string, Queued>, tried: Set<string>, busy: { on: boolean; warned: boolean }) {
+  if (busy.on || !queue.size) return
+  busy.on = true
+  try {
+    if (!(await read($, isOn))) return queue.clear()
+    for (const [id, q] of queue) {
+      if (++q.ticks < SETTLE_TICKS) continue
+      queue.delete(id)
+      if (tried.has(q.text)) continue
+      tried.add(q.text) // one attempt per text: a failure is not retried on every redraw
+      const out = await toLang($, q.text, 'en', 'th', TO_TH)
+      if (out) {
+        busy.warned = false
+        await update($, thai, m => ({ ...m, [q.text]: out }))
+      } else if (!busy.warned) {
+        busy.warned = true // one toast per outage, not one per reply
+        $.ui.toast('thai-translate: could not translate a reply (Google and haiku both failed)')
+      }
+    }
+  } finally {
+    busy.on = false
+  }
 }
 
 export const register: Register = on => {
-  const latest = new Map<string, string>() // message id -> newest text seen
+  const queue = new Map<string, Queued>() // message id -> newest text, waiting to settle
   const tried = new Set<string>() // texts already sent for translation
+  const busy = { on: false, warned: false }
+  let timer: { cancel: () => void } | undefined
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'thai', description: 'Toggle Thai⇄English translation of prompts and replies' })
     const saved = (await $.store.get('isOn')) === true
     await update($, isOn, () => saved)
     $.ui.status(saved ? STATUS : undefined)
+    timer?.cancel() // a second session.start must not stack a second ticker
+    timer = $.clock.every(TICK_MS, () => pump($, queue, tried, busy).catch(() => {}))
     return next(e)
   })
 
@@ -119,9 +143,8 @@ export const register: Register = on => {
     if (done) return next({ ...e, props: { ...e.props, text: done } })
     // off-screen blocks wait until scrolled into view, so toggling on doesn't translate the whole transcript
     if (e.props.onScreen === null || tried.has(text)) return next(e)
-    latest.set(e.requestId, text)
-    // shows English until the Thai arrives, then the atom write redraws
-    translate($, latest, tried, e.requestId, text).catch(() => {})
+    // shows English until the timer translates it, then the atom write redraws
+    if (queue.get(e.requestId)?.text !== text) queue.set(e.requestId, { text, ticks: 0 })
     return next(e)
   })
 }
