@@ -22,4 +22,4 @@ Every session has a ledger at `~/.claude/work/<session_id>/ledger.md` (the path 
 
 # Language
 
-- Write code comments, commit messages, PR text and identifiers in English, even when the conversation is in another language.
+- Everything that is not a reply to the user is written in English, even when the conversation is in another language: code, comments, identifiers, commit messages, PR and issue text, docs, READMEs, CLAUDE.md, memory files, skills, plans and reports saved to files, and subagent prompts.

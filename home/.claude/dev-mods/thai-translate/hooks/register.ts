@@ -139,14 +139,20 @@ type Work = {
   timer?: { cancel: () => void }
 }
 
-// /clear starts a new session id without session.start, and session state may start over, so
-// the switch is read from $.store (kept across sessions); reading the atoms too redraws on /thai
+// /clear starts a new session id without session.start, so the switch is read from $.store under
+// the current session id (not session state); reading the atoms too redraws on /thai.
+// The switch belongs to one session: a new session (and /clear, which starts one) begins off.
+// shortcut: three small keys per session stay in the store; prune old sessions if it ever matters
+async function key($: EngineInterface, name: string) {
+  return `${await $.session.id()}:${name}`
+}
+
 async function active($: EngineInterface): Promise<Plan | undefined> {
   await read($, isOn)
   await read($, langAtom)
-  if ((await $.store.get('isOn')) !== true) return undefined
-  if ((await $.store.get('lang')) !== 'cn') return { mode: 'th', from: L.en, to: L.th }
-  return { mode: 'cn', from: L.zh, to: (await $.store.get('replyLang')) === 'en' ? L.en : L.th }
+  if ((await $.store.get(await key($, 'isOn'))) !== true) return undefined
+  if ((await $.store.get(await key($, 'lang'))) !== 'cn') return { mode: 'th', from: L.en, to: L.th }
+  return { mode: 'cn', from: L.zh, to: (await $.store.get(await key($, 'replyLang'))) === 'en' ? L.en : L.th }
 }
 
 async function translate($: EngineInterface, w: Work, key: string, plan: Plan) {
@@ -202,7 +208,7 @@ export const register: Register = on => {
     const plan = await active($)
     await update($, isOn, () => !!plan)
     // the atom must hold the stored mode, or a later /thai switch writes an unchanged value and does not redraw
-    const id: LangId = (await $.store.get('lang')) === 'cn' ? 'cn' : 'th'
+    const id: LangId = (await $.store.get(await key($, 'lang'))) === 'cn' ? 'cn' : 'th'
     await update($, langAtom, () => id)
     $.ui.status(plan ? STATUS[plan.mode] : undefined)
     w.timer?.cancel() // a second session.start must not stack a second ticker
@@ -211,10 +217,18 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // /clear ends this session with no session.start after it: the new one starts off, so clear the status line
+  on('session.end', async ($, e, next) => {
+    $.ui.status(undefined)
+    w.ready.clear()
+    w.tails.clear()
+    return next(e)
+  })
+
   // /thai toggles; /thai th|cn picks the mode and turns on; /thai on|off sets the switch
   on('command.run', { command: 'thai' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
-    const wasOn = (await $.store.get('isOn')) === true
+    const wasOn = (await $.store.get(await key($, 'isOn'))) === true
     // named by the language Claude works in; 'th' kept as the old name of en mode
     const pick = arg === 'en' || arg === 'th' ? 'th' : arg === 'cn' ? 'cn' : undefined
     if (arg && !pick && arg !== 'on' && arg !== 'off') return { text: 'Usage: /thai [on|off|en|cn]' }
@@ -222,11 +236,13 @@ export const register: Register = on => {
     // switching drops pending work
     w.ready.clear()
     w.tails.clear()
-    if (pick) {
-      await $.store.set('lang', pick)
-      await update($, langAtom, () => pick)
+    // turning on without naming a mode is Thai⇄English
+    const mode = pick ?? (arg === 'on' || (now && !wasOn) ? 'th' : undefined)
+    if (mode) {
+      await $.store.set(await key($, 'lang'), mode)
+      await update($, langAtom, () => mode)
     }
-    await $.store.set('isOn', now)
+    await $.store.set(await key($, 'isOn'), now)
     await update($, isOn, () => now)
     const plan = await active($)
     $.ui.status(plan ? STATUS[plan.mode] : undefined)
@@ -258,7 +274,7 @@ export const register: Register = on => {
     // only a prompt with no Thai or Latin letters (all Chinese, or e.g. "1") goes as typed and keeps the reply language
     if (!THAI.test(e.text) && !/[A-Za-z]/.test(e.text)) return next({ ...e, text: e.text + ASK_ZH })
     const typed = THAI.test(e.text) ? L.th : L.en
-    if (THAI.test(e.text) || /[A-Za-z]/.test(e.text)) await $.store.set('replyLang', typed === L.th ? 'th' : 'en')
+    if (THAI.test(e.text) || /[A-Za-z]/.test(e.text)) await $.store.set(await key($, 'replyLang'), typed === L.th ? 'th' : 'en')
     // shortcut: replies already drawn follow the newest prompt's language too; store it per turn if that bothers users
     const out = await toLang($, e.text, typed, L.zh, 'auto')
     if (!out) {

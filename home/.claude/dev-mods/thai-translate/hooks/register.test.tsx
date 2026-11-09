@@ -12,6 +12,9 @@ const MSG = (text: string, id = 'msg-1') => ({
 const engine = (on: any, calls: string[], seed?: any) => {
   on('command.register', () => ({ value: { command: 'thai' } }))
   mock.store(on, seed)
+  let sid = 's1'
+  on('session.id', () => ({ value: sid }))
+  ;(globalThis as any).newSession = () => { sid = `s${Number(sid.slice(1)) + 1}` }
   on('ui.status', () => ({ value: undefined }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('prompt.submit', (_: unknown, e: any) => ({ text: e.text }))
@@ -105,9 +108,9 @@ test('streaming: finished paragraphs show in Thai at once, the one being written
   expect(calls).toEqual(['First.', 'Second grows']) // each paragraph once; the cut-off 'Sec' never settled
 })
 
-test('after /clear (no session.start) and with the switch stored on, replies are still translated', async ($, on) => {
+test('without session.start, the switch stored for this session id still translates', async ($, on) => {
   const calls: string[] = []
-  engine(on, calls, { isOn: true })
+  engine(on, calls, { 's1:isOn': true })
   const clock = mock.clock(on)
   on('ui.render', ($: any, e: any) => {
     const { Text } = $.ui.resolve(e)
@@ -235,9 +238,9 @@ test('/thai cn: a Chinese prompt goes as typed and keeps the reply language', as
   expect(await shown('好。', 'z')).toBe('TH(好。)')
   expect(calls).toEqual(['zh-CN:สวัสดี', '好。'])
 })
-test('restart with cn stored: replies show in the stored reply language; bare toggles keep cn; /thai th returns', async ($, on) => {
+test('cn stored for this session: replies show in the stored reply language; on again is Thai⇄English', async ($, on) => {
   const calls: string[] = []
-  engine(on, calls, { isOn: true, lang: 'cn', replyLang: 'en' })
+  engine(on, calls, { 's1:isOn': true, 's1:lang': 'cn', 's1:replyLang': 'en' })
   const clock = mock.clock(on)
   on('ui.render', ($: any, e: any) => {
     const { Text } = $.ui.resolve(e)
@@ -251,7 +254,7 @@ test('restart with cn stored: replies show in the stored reply language; bare to
   expect((await u2.find({ type: 'Text' } as never))?.text).toBe('EN(完成。)')
   await u2.unmount()
   await $.command.run({ command: 'thai', args: '' } as never) // off
-  expect(((await $.command.run({ command: 'thai', args: ' ON ' } as never)) as any).text).toMatch(/Chinese pivot/)
+  expect(((await $.command.run({ command: 'thai', args: ' ON ' } as never)) as any).text).toMatch(/Thai translation on/) // on again: Thai⇄English
   expect(((await $.command.run({ command: 'thai', args: 'en' } as never)) as any).text).toMatch(/Thai translation on/)
   expect(((await $.command.run({ command: 'thai', args: 'th' } as never)) as any).text).toMatch(/Thai translation on/)
 })
@@ -332,4 +335,17 @@ test('mixed prompts are translated: Thai+Chinese in cn mode, Chinese in Thai mod
   await $.command.run({ command: 'thai', args: 'cn' } as never)
   expect(((await $.prompt.submit({ text: '修复 bug 一下' } as never)) as any).text).toBe('中(修复 bug 一下)\n\n（请用简体中文回答。）')
   expect(calls).toEqual(['en:你好 ครับ', 'zh-CN:修复 bug 一下'])
+})
+
+test('a new session (or /clear) starts off; /thai turns on Thai⇄English even after cn', async ($, on) => {
+  const { calls, clock, shown } = await setup($, on)
+  await $.command.run({ command: 'thai', args: 'cn' } as never)
+  ;(globalThis as any).newSession()
+  expect(await shown('Done.', 'n')).toBe('Done.')
+  await clock.advance(3000)
+  expect(calls).toEqual([])
+  expect(((await $.command.run({ command: 'thai', args: '' } as never)) as any).text).toMatch(/Thai translation on/)
+  await $.command.run({ command: 'thai', args: 'cn' } as never)
+  await $.command.run({ command: 'thai', args: 'off' } as never)
+  expect(((await $.command.run({ command: 'thai', args: 'on' } as never)) as any).text).toMatch(/Thai translation on/)
 })
