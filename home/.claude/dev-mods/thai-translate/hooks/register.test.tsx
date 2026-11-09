@@ -19,7 +19,7 @@ const engine = (on: any, calls: string[]) => {
   on('http.fetch', (_: unknown, e: any) => {
     const src = decodeURIComponent(e.init.body.slice(2))
     calls.push(src)
-    if (src === 'Boom.' || src === 'Haiku.') return { value: { status: 429, ok: false, headers: {}, text: '' } }
+    if (src === 'Boom.' || src === 'Haiku.' || src === 'Viet.' || src.includes('สมุด')) return { value: { status: 429, ok: false, headers: {}, text: '' } }
     // like live gtx: trims the request, and drops the space after "#"
     const th = (THAI_OF[src] ?? src.trim().split("\n").map(l => `TH(${l})`).join("\n")).replace(/^TH\(# /gm, "TH(#")
     return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify([[[th, src]]]) } }
@@ -28,6 +28,8 @@ const engine = (on: any, calls: string[]) => {
     const src = e.prompt.replace(/^<text>\n|\n<\/text>$/g, '')
     calls.push(`haiku:${src}`)
     if (src === 'Boom.') return { value: { isAnswered: false, reason: 'api-error', usage: {} } }
+    if (src === 'Viet.') return { value: { isAnswered: true, text: 'Đúng vậy.', usage: {} } }
+    if (src.includes('สมุด')) return { value: { isAnswered: true, text: 'Please edit the file สมุด.md', usage: {} } }
     return { value: { isAnswered: true, text: 'จากไฮกุ', usage: {} } }
   })
 }
@@ -119,4 +121,22 @@ test('Google fails: haiku fallback; fenced code is never sent to Google', async 
   await clock.advance(3000)
   expect(await shown(md, 'b')).toBe('# TH(Run it)\n\n```sh\nls -la\n```\n\nเสร็จแล้ว\n\n```sh\ncut off')
   expect(calls.slice(-2)).toEqual(['Run it', 'Done.'])
+})
+
+test('haiku answering in the wrong language (not Thai script) keeps the English', async ($, on) => {
+  const { calls, clock, shown, end } = await setup($, on)
+  await shown('Viet.', 'v')
+  await end('Viet.')
+  await clock.advance(3000)
+  expect(calls).toEqual(['Viet.', 'haiku:Viet.'])
+  expect(await shown('Viet.', 'v')).toBe('Viet.')
+})
+
+test('Google fails on a Thai prompt: haiku English that quotes a Thai name is still used', async ($, on) => {
+  const calls: string[] = []
+  engine(on, calls)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'thai', args: '' } as never)
+  const r: any = await $.prompt.submit({ text: 'แก้ไฟล์ สมุด.md หน่อย' } as never)
+  expect(r.text).toBe('Please edit the file สมุด.md')
 })
