@@ -14,3 +14,4 @@
 .agents/skills
 .claude/dev-mods/workflow-rail
 .tmux/tmux.conf
+.claude/dev-mods/thai-translate
