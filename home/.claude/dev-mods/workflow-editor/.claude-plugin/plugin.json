@@ -1,0 +1,1 @@
+{ "name": "workflow-editor", "version": "0.1.0", "description": "Your editable workflow rules (~/.claude/workflow.md) injected into Claude's system prompt; /workflow-edit pane adds, edits, deletes, reorders and toggles steps.", "types": "./types/index.d.ts" }

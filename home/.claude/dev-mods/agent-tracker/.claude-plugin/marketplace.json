@@ -1,0 +1,1 @@
+{"name":"agent-tracker-local","owner":{"name":"local"},"plugins":[{"name":"agent-tracker","source":"./"}]}

@@ -1,0 +1,1 @@
+{ "name": "prompt-enhancer", "version": "0.2.0", "description": "Start a prompt with \"++ \" and haiku writes a brief (goal, constraints, unknowns, done-check) for Claude. /enhance ask shows it for approval first; /enhance auto sends right away." }

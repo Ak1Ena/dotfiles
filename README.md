@@ -8,6 +8,28 @@ Highlights:
 - `home/.claude/dev-mods/workflow-rail/` is a Claude Code plugin that shows the workflow live: a `Plan · Build · Prove · QC · Report` band above the prompt, a `QC:` status line, the task title, a QC pane via `/workflow`, and teammate dots in the tmux status bar (`@wf_team`) in c-team. It reads `qc-gate.sh status`. settings.json enables it from a local directory marketplace; on a new machine run `claude plugin install workflow-rail@workflow-rail-local` if it does not load. Tests: `cd home/.claude/dev-mods/workflow-rail && claude plugin test`. Band style options: `docs/workflow-band-styles.html`.
 - `home/.claude/settings.json` caps context growth (auto-compact window, Bash/MCP output limits).
 
+## Claude Code mods (pick what you want)
+
+This repo is also a plugin marketplace. Add it once, then install only the mods you want:
+
+```sh
+claude plugin marketplace add Ak1Ena/dotfiles
+claude plugin install thai-translate@ak1ena-mods   # any name below
+```
+
+Or run `/plugin` inside Claude Code and choose from the `ak1ena-mods` list.
+
+| Mod | What it does |
+|-----|--------------|
+| `thai-translate` | `/thai` toggles: Thai prompts reach Claude in English, replies show in Thai (Google Translate, haiku fallback). Text goes to Google while on. |
+| `prompt-enhancer` | Start a prompt with `++ ` and haiku writes a brief for Claude. |
+| `final-message` | Claude keeps mid-turn text to one line and puts results in the final message. |
+| `agent-tracker` | Live pane of what the main thread, subagents and teammates are doing. `/tracker`. |
+| `workflow-editor` | Edit workflow rules in `~/.claude/workflow.md` from a `/workflow-edit` pane; injected into the system prompt. |
+| `workflow-rail` | Plan > Build > Prove > QC > Report band. Needs `home/.claude/hooks/qc-gate.sh`. |
+
+Update later with `claude plugin marketplace update ak1ena-mods`.
+
 ## Use
 
 - `./sync.sh` mirrors the live setup into `home/`. Run it, then commit.

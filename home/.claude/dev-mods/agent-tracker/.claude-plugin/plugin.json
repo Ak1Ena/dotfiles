@@ -1,0 +1,1 @@
+{ "name": "agent-tracker", "version": "0.1.0", "description": "Live pane showing what the main thread, each subagent and each teammate is doing: status and current tool call. /tracker reopens it.", "types": "./types.d.ts" }

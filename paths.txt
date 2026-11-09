@@ -15,3 +15,7 @@
 .claude/dev-mods/workflow-rail
 .tmux/tmux.conf
 .claude/dev-mods/thai-translate
+.claude/dev-mods/prompt-enhancer
+.claude/dev-mods/agent-tracker
+.claude/dev-mods/final-message
+.claude/dev-mods/workflow-editor

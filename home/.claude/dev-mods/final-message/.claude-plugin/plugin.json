@@ -1,0 +1,1 @@
+{ "name": "final-message", "version": "0.1.0", "description": "Adds a system-prompt rule so Claude keeps text between tool calls to a one-line status and puts every finding, answer, question and decision in the final message the user reads." }
