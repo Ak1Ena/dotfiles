@@ -1,1 +1,46 @@
-{"name": "ak1ena-mods", "owner": {"name": "Ak1Ena"}, "metadata": {"description": "Claude Code mods. Add this marketplace, then install only the ones you want."}, "plugins": [{"name": "thai-translate", "source": "./home/.claude/dev-mods/thai-translate", "description": "/thai en: Thai prompts go to Claude in English, replies shown in Thai. /thai cn: Thai/English prompts go in Chinese, replies shown in the language you typed. Only messages after turning it on are translated."}, {"name": "prompt-enhancer", "source": "./home/.claude/dev-mods/prompt-enhancer", "description": "Start a prompt with \"++ \" and haiku writes a brief (goal, constraints, unknowns, done-check) for Claude. /enhance ask shows it for approval first; /enhance auto sends right away."}, {"name": "final-message", "source": "./home/.claude/dev-mods/final-message", "description": "System-prompt rule: Claude keeps text between tool calls to a one-line status and puts every finding, answer and decision in the final message."}, {"name": "agent-tracker", "source": "./home/.claude/dev-mods/agent-tracker", "description": "Agents pane (open from session start) showing what the main thread, subagents and teammates are doing, plus True/False cards for Claude's logged assumptions. /tracker, /assumptions."}, {"name": "workflow-editor", "source": "./home/.claude/dev-mods/workflow-editor", "description": "Your editable workflow rules (~/.claude/workflow.md) injected into Claude's system prompt; Workflow pane open from session start, or /workflow-edit."}, {"name": "workflow-rail", "source": "./home/.claude/dev-mods/workflow-rail", "description": "Plan > Build > Prove > QC > Report band above the prompt. Needs home/.claude/hooks/qc-gate.sh from this repo for the QC status."}, {"name": "header-tray", "source": "./home/.claude/dev-mods/header-tray", "description": "Band above the prompt: live subagents/teammates and your newest artifacts (click to preview). /tray toggles."}]}
+{
+  "name": "ak1ena-mods",
+  "owner": {
+    "name": "Ak1Ena"
+  },
+  "metadata": {
+    "description": "Claude Code mods. Add this marketplace, then install only the ones you want."
+  },
+  "plugins": [
+    {
+      "name": "thai-translate",
+      "source": "./home/.claude/dev-mods/thai-translate",
+      "description": "/thai en: Thai prompts go to Claude in English, replies shown in Thai. /thai cn: Thai/English prompts go in Chinese, replies shown in the language you typed. Only messages after turning it on are translated."
+    },
+    {
+      "name": "prompt-enhancer",
+      "source": "./home/.claude/dev-mods/prompt-enhancer",
+      "description": "Start a prompt with \"++ \" and haiku writes a brief (goal, constraints, unknowns, done-check) for Claude. /enhance ask shows it for approval first; /enhance auto sends right away."
+    },
+    {
+      "name": "final-message",
+      "source": "./home/.claude/dev-mods/final-message",
+      "description": "System-prompt rule: Claude keeps text between tool calls to a one-line status and puts every finding, answer and decision in the final message."
+    },
+    {
+      "name": "agent-tracker",
+      "source": "./home/.claude/dev-mods/agent-tracker",
+      "description": "Agents pane (open from session start) showing what the main thread, subagents and teammates are doing, plus True/False cards for Claude's logged assumptions. /tracker, /assumptions."
+    },
+    {
+      "name": "workflow-editor",
+      "source": "./home/.claude/dev-mods/workflow-editor",
+      "description": "Your editable workflow rules (~/.claude/workflow.md) injected into Claude's system prompt; Workflow pane open from session start, or /workflow-edit."
+    },
+    {
+      "name": "workflow-rail",
+      "source": "./home/.claude/dev-mods/workflow-rail",
+      "description": "Plan > Build > Prove > QC > Report band above the prompt. Needs home/.claude/hooks/qc-gate.sh from this repo for the QC status."
+    },
+    {
+      "name": "header-tray",
+      "source": "./home/.claude/dev-mods/header-tray",
+      "description": "Band above the prompt: live subagents/teammates and your newest artifacts (click to preview). /tray toggles."
+    }
+  ]
+}
