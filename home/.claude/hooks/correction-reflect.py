@@ -27,7 +27,7 @@ CONTEXT = (
     "CORRECTION CHECK (matched: {why}). The user may be correcting you. If so: "
     "(1) Open your reply with one line: `Reflect: I did <what you did>; should have <what the user wanted>.` "
     "(2) Fix it. "
-    "(3) If the lesson would recur in other repos, update ~/.claude/CLAUDE.md: sharpen the existing line that "
+    "(3) If the lesson would recur in other repos, update ~/.claude/workflow.md (workflow steps; edit via /workflow-edit) or ~/.claude/CLAUDE.md (other sections): sharpen the existing line that "
     "covers it, otherwise add one short imperative line to the matching section. Never add a second copy of a rule. "
     "No employer names, people, hosts or ticket ids there (it syncs to a public repo); run ~/dotfiles/sync.sh after. "
     "Repo-specific lessons go to that repo's CLAUDE.md or memory instead. Say in one line what you changed, or that "

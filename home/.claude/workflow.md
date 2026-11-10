@@ -4,7 +4,9 @@
   - A question ("is it possible?", "what do you think?", "why X?") gets an answer only: yes/no first, then at most 3 lines. No edits, restarts or setup until the user says go.
   - "Publish"/"apply" for personal tooling (mod, plugin, hook) means install it for all local sessions; GitHub only when named.
   - If the user can unblock you in one step (start a VM, log in, open an app), say what to do and wait instead of building a workaround.
-- [x] **Plan small, verifiable steps.** For multi-step work, list the steps (TaskCreate/todo). Each step ends in something you can check.
+- [x] if: check if it need code change
+- [x] yes: **Plan small, verifiable steps.** For multi-step work, list the steps (TaskCreate/todo). Each step ends in something you can check.
+- [x] no: stop and told user that can config it
 - [x] **Do, then prove.** Run the real test, build, or app. "Should work" is not done. For anything the user views (UI, plugin, skill, served page, review site), check the exact copy they get: the installed plugin cache, the running server on the pushed commit, the page in a browser. Never report "done" or "stopped" on code alone. Report failures with the shortest decisive output line.
   - Same error or hook block twice: stop. Read the message, change approach, or tell the user. Never reword a blocked command to slip past a hook or the auto-mode classifier.
   - Anything over ~30s (test suites, screenshots, builds) runs in the background with an ETA.

@@ -54,3 +54,17 @@ test('diagram: add, if/else, drag into a branch, toggle, delete, undo, edit', as
   expect(body()).toEqual(['- [x] first step', '- [x] added by hand', '- [x] if: the task edits code', '- [x] yes: run tests'])
   await ui.unmount()
 })
+
+test('session.start opens the Workflow pane without focus; the pane draws no custom tray', async ($, on) => {
+  const opened: any[] = []
+  on('env.get', () => ({ value: '/home/u' }))
+  on('fs.exists', () => ({ value: false }))
+  on('command.register', () => ({ value: { command: 'workflow-edit' } }))
+  on('ui.open', (_, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  expect(opened.map((o) => [o.id, o.focus])).toEqual([['workflow-editor', undefined]])
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Button', key: 'tab-nvim' } as never)).toBeUndefined()
+  await ui.unmount()
+})

@@ -21,11 +21,12 @@ Or run `/plugin` inside Claude Code and choose from the `ak1ena-mods` list.
 
 | Mod | What it does |
 |-----|--------------|
-| `thai-translate` | `/thai` toggles: Thai prompts reach Claude in English, replies show in Thai (Google Translate, haiku fallback). Text goes to Google while on. |
+| `thai-translate` | `/thai en`: Thai prompts reach Claude in English, replies show in Thai. `/thai cn`: Thai/English prompts go to Claude in Chinese and replies show in the language you typed. Only messages that appear after you turn it on are translated. Google Translate, haiku fallback; text goes to Google while on. |
 | `prompt-enhancer` | Start a prompt with `++ ` and haiku writes a brief for Claude. |
 | `final-message` | Claude keeps mid-turn text to one line and puts results in the final message. |
-| `agent-tracker` | Live pane of what the main thread, subagents and teammates are doing. `/tracker`. |
-| `workflow-editor` | Edit workflow rules in `~/.claude/workflow.md` from a `/workflow-edit` pane; injected into the system prompt. |
+| `agent-tracker` | `✻ Agents` pane, open from session start: what the main thread, subagents and teammates are doing, plus True/False cards for assumptions Claude logged. `/tracker`, `/assumptions`. |
+| `workflow-editor` | Edit workflow rules in `~/.claude/workflow.md` from the `Workflow` pane (open from session start, or `/workflow-edit`); injected into the system prompt. |
+| `header-tray` | Band above the prompt: live subagents/teammates and your 5 newest artifacts (click to preview). `/tray` toggles. |
 | `workflow-rail` | Plan > Build > Prove > QC > Report band. Needs `home/.claude/hooks/qc-gate.sh`. |
 
 Update later with `claude plugin marketplace update ak1ena-mods`.

@@ -172,3 +172,17 @@ test('after the cards, a FALSE mark is sent to Claude straight away as its own p
   const next = await $.prompt.submit({ text: 'hi', wait: false, origin: { kind: 'composer' } })
   expect(next.context).toBeUndefined() // already told, not repeated
 })
+
+test('session.start opens the Agents pane unfocused; the pane draws no tab tray', async ($, on) => {
+  const opened: any[] = []
+  on('command.register', () => ({ value: { command: 'tracker' } }))
+  on('ui.open', (_: unknown, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
+  on('agent.list', () => ({ value: [] }))
+  on('clock.every', () => ({ value: undefined }))
+  await $.session.start(start)
+  expect(opened.map((p) => [p.id, p.title, p.focus])).toEqual([['agent-tracker', '✻ Agents', undefined]])
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Button', key: 'tab-agents' } as never)).toBeUndefined()
+  await ui.unmount()
+})

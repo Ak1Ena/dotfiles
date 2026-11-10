@@ -59,8 +59,9 @@ const refresh = ($: any) => serial(async () => { const l = await load($); await 
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'workflow-edit', description: 'Edit, add, delete or toggle the workflow steps Claude follows' })
+    await $.command.register({ name: 'workflow-edit', description: 'Edit, add, delete or toggle the workflow steps Claude follows', immediate: true })
     await refresh($)
+    $.ui.open({ id: PANE, title: 'Workflow' }).catch(() => {}) // always shown, no focus; /workflow-edit focuses it
     return next(e)
   })
 

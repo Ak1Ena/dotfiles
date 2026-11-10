@@ -227,8 +227,8 @@ function apply(d) {
   // incremental render: only touch nodes that changed
   const chat = $("#chat"); const near = first || innerHeight + scrollY >= document.body.scrollHeight - 160;
   const html = d.messages.map(msgHtml);
-  if (!html.length && !chat.children.length) chat.innerHTML = `<p class="empty">No messages yet. Say something below.</p>`;
-  else if (html.length) {
+  if (!html.length) { if (!chat.querySelector(".empty")) chat.innerHTML = `<p class="empty">No messages yet. Say something below.</p>`; rendered = []; }  // /clear: new session has no messages, wipe old ones
+  else {
     if (chat.querySelector(".empty")) { chat.innerHTML = ""; rendered = []; }
     const shift = rendered.length && html.length && rendered[0] !== html[0] ? (() => { chat.innerHTML = ""; rendered = []; })() : 0;
     html.forEach((h, i) => {

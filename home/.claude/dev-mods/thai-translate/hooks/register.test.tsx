@@ -349,3 +349,25 @@ test('a new session (or /clear) starts off; /thai turns on Thai⇄English even a
   await $.command.run({ command: 'thai', args: 'off' } as never)
   expect(((await $.command.run({ command: 'thai', args: 'on' } as never)) as any).text).toMatch(/Thai translation on/)
 })
+
+test('a message drawn while off stays original after /thai on, and queues no translation', async ($, on) => {
+  const { calls, clock, shown } = await setup($, on)
+  await $.command.run({ command: 'thai', args: '' } as never) // off
+  expect(await shown('Done.', 'old')).toBe('Done.')
+  await $.command.run({ command: 'thai', args: '' } as never) // on again
+  expect(await shown('Done.', 'old')).toBe('Done.')
+  await clock.advance(3000)
+  expect(await shown('Done.', 'old')).toBe('Done.')
+  expect(calls).toEqual([])
+})
+
+test('a message first drawn while on is translated, and keeps translating after off and on', async ($, on) => {
+  const { clock, shown } = await setup($, on)
+  expect(await shown('Done.', 'new')).toBe('Done.')
+  await clock.advance(3000)
+  expect(await shown('Done.', 'new')).toBe('เสร็จแล้ว')
+  await $.command.run({ command: 'thai', args: '' } as never) // off
+  expect(await shown('Done.', 'new')).toBe('Done.')
+  await $.command.run({ command: 'thai', args: '' } as never) // on
+  expect(await shown('Done.', 'new')).toBe('เสร็จแล้ว')
+})

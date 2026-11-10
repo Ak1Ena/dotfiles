@@ -145,16 +145,17 @@ check "commit of quoted-name file allows" allow "$(ev $S "$R" gate)"
 echo x >>"$R/$q"
 check "edit of quoted-name file blocks" block "$(ev $S "$R" gate)"
 
-# 14. lead is not blocked while its teammate is active; blocked again once idle
-R=$T/r14; newrepo "$R"; S=t14-$$; export QC_TEAMS_DIR=$T/teams; mkdir -p "$QC_TEAMS_DIR/x"
-team() { jq -nc --arg s "$1" --argjson a "$2" '{leadSessionId:$s,members:[{agentType:"team-lead"},{agentType:"builder",isActive:$a}]}' >"$QC_TEAMS_DIR/x/config.json"; }
+# 14. lead is not blocked while a live teammate of its own is active (matched by --parent-session-id,
+# which survives --continue; the config's leadSessionId does not)
+R=$T/r14; newrepo "$R"; S=t14-$$; export QC_TEAMS_DIR=$T/teams QC_PS="cat $T/ps.txt"; mkdir -p "$QC_TEAMS_DIR/x"
+team() { jq -nc --argjson a "$1" '{leadSessionId:"old-sid",members:[{name:"team-lead"},{name:"bob",isActive:$a}]}' >"$QC_TEAMS_DIR/x/config.json"; }
+proc() { echo "claude --agent-id bob@x --agent-name bob --team-name x --parent-session-id $1 --agent-type builder" >"$T/ps.txt"; }
 ev $S "$R" baseline; seq 1 20 >>"$R/a.js"
-team $S true;  check "active teammate allows lead stop" allow "$(ev $S "$R" gate)"
-team other true; check "other team's teammate does not count" block "$(ev $S "$R" gate)"
-team $S false; check "idle teammate blocks again" block "$(ev $S "$R" gate)"
-team $S true; touch -t 202001010000 "$QC_TEAMS_DIR/x/config.json"
-check "stale active flag blocks" block "$(ev $S "$R" gate)"
-unset QC_TEAMS_DIR
+team true; proc $S; check "active live teammate allows lead stop" allow "$(ev $S "$R" gate)"
+proc other;  check "other lead's teammate does not count" block "$(ev $S "$R" gate)"
+: >"$T/ps.txt"; check "dead teammate with stale active flag blocks" block "$(ev $S "$R" gate)"
+team false; proc $S; check "idle teammate blocks" block "$(ev $S "$R" gate)"
+unset QC_TEAMS_DIR QC_PS
 
 echo "$fails failed (temp: $T)"
 for s in t1 t1b t1c t2 t3 t4 t5 t6 t7 t8 t9 t11 t12 t12b t13 t13b t14; do d="$HOME/.claude/work/$s-$$"; [[ -d $d ]] && mv "$d" "$T/state-$s"; done

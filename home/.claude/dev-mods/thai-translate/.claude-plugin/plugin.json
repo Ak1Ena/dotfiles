@@ -1,1 +1,1 @@
-{"name": "thai-translate", "version": "0.2.1", "description": "/thai en: Thai prompts go to Claude in English, replies shown in Thai. /thai cn: Thai/English prompts go to Claude in Chinese, Claude answers in Chinese, replies shown in the language you typed.", "types": "./types/index.d.ts"}
+{"name": "thai-translate", "version": "0.2.2", "description": "/thai en: Thai prompts go to Claude in English, replies shown in Thai. /thai cn: Thai/English prompts go to Claude in Chinese, Claude answers in Chinese, replies shown in the language you typed.", "types": "./types/index.d.ts"}

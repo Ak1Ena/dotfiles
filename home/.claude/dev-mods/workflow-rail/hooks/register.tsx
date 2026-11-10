@@ -180,6 +180,8 @@ export const register: Register = on => {
     const lvl = await read($, hit)
     const isDetail = await read($, detail)
     if (lvl < 0 && !isDetail) return next(e)
+    // Compose with other mods' bands (header-tray) instead of hiding them.
+    const below = await next(e)
     const { Box, Text } = $.ui.resolve(e)
     const q = await read($, qc)
     const bad = isBlocked(q)
@@ -208,6 +210,7 @@ export const register: Register = on => {
             {` · blocks ${r.blocks}/${MAX_BLOCKS}`}
           </Text>
         ))}
+        {below}
       </Box>
     )
   })

@@ -125,7 +125,6 @@ const KEEP = 30 // agent rows kept besides main; finished ones go first
 const SYNC_MS = 2000
 // Change the tag when AgentRow's fields change: it declines what an earlier version stored.
 const rows = atom({ plugin: 'agent-tracker', key: 'rows' } as const, [] as AgentRow[], { shape: 'rows-2' })
-
 // Claude Code's welcome-screen figure, drawn in block characters.
 const CLAWD = [' ▐▛███▜▌ ', '▝▜█████▛▘', '  ▘▘ ▝▝  ']
 

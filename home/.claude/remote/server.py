@@ -415,7 +415,8 @@ class H(BaseHTTPRequestHandler):
         last, beat = "", time.time()
         try:
             while True:
-                if not find(s["name"]):
+                s = find(s["name"])  # re-read: /clear and /resume switch the session id under the same tmux pane
+                if not s:
                     self.wfile.write(b"event: gone\ndata: {}\n\n"); self.wfile.flush(); return
                 data = json.dumps(snapshot(s))
                 h = hashlib.md5(data.encode()).hexdigest()

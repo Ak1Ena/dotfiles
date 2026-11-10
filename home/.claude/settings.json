@@ -83,15 +83,14 @@
       "Bash(kubectl taint*)",
       "Bash(kubectl uncordon*)"
     ],
-    "defaultMode": "auto",
     "ask": [
       "Bash(git push:*)",
       "Bash(git -C * push:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr ready:*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
-  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -136,16 +135,6 @@
         ]
       },
       {
-        "matcher": "startup|resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js' ensure --settings '/Users/m129/.claude/settings.json'",
-            "timeout": 60
-          }
-        ]
-      },
-      {
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
@@ -184,15 +173,6 @@
             "type": "command",
             "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
-            "timeout": 60
           }
         ]
       },
@@ -251,16 +231,6 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
-            "timeout": 60
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -312,15 +282,6 @@
             "type": "command",
             "command": "node \"/Users/m129/.pixel-agents/hooks/claude-hook.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
-            "timeout": 60
           }
         ]
       },
@@ -384,15 +345,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "OPTIMIZER_MODE='always-on' OPTIMIZER_BIN='/Users/m129/.local/bin/optimizer' '/Users/m129/.nvm/versions/node/v24.18.0/bin/node' '/Users/m129/.nvm/versions/node/v24.18.0/lib/node_modules/@optimizer-layer/agent-adapter/dist/claude-hook.js'",
-            "timeout": 60
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "python3 -I /Users/m129/.claude/hooks/egm-detect.py",
             "timeout": 10
           }
@@ -436,7 +388,12 @@
     "productivity@knowledge-work-plugins": false,
     "cowork-plugin-management@knowledge-work-plugins": false,
     "egm@egm": true,
-    "workflow-rail@workflow-rail-local": true
+    "workflow-rail@workflow-rail-local": true,
+    "prompt-enhancer@prompt-enhancer-local": true,
+    "agent-tracker@agent-tracker-local": true,
+    "final-message@final-message-local": true,
+    "workflow-editor@workflow-editor-local": true,
+    "thai-translate@thai-translate-local": true
   },
   "extraKnownMarketplaces": {
     "claude-code-warp": {
@@ -486,12 +443,49 @@
         "source": "directory",
         "path": "/Users/m129/.claude/dev-mods/workflow-rail"
       }
+    },
+    "prompt-enhancer-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/prompt-enhancer"
+      }
+    },
+    "agent-tracker-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/agent-tracker"
+      }
+    },
+    "final-message-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/final-message"
+      }
+    },
+    "workflow-editor-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/workflow-editor"
+      }
+    },
+    "thai-translate-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/thai-translate"
+      }
+    },
+    "header-tray-local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/m129/.claude/dev-mods/header-tray"
+      }
     }
   },
   "effortLevel": "high",
   "modelSettings": {
     "claude-opus-5-5": {
-      "autoCompactWindow": 200000
+      "effortLevel": "medium",
+      "autoCompactWindow": 400000
     },
     "claude-sonnet-5-5": {
       "effortLevel": "medium"

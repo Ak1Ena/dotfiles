@@ -33,7 +33,7 @@ Filtered events run to hundreds of KB. Split by project (`jq` on `events.jsonl`)
 
 ## 4. Apply and report
 
-- Edit `~/.claude/CLAUDE.md`: merge into existing sections, keep it short, delete rules the data shows are dead or wrong.
-- Hooks and skills changes follow the QC rule in CLAUDE.md.
+- Edit `~/.claude/workflow.md` (workflow steps) or `~/.claude/CLAUDE.md` (other sections): merge into existing sections, keep it short, delete rules the data shows are dead or wrong.
+- Hooks and skills changes follow the QC rule in ~/.claude/workflow.md.
 - Run `~/dotfiles/sync.sh` after config changes; commit or push only when asked.
 - Report: top patterns with counts, what changed where, what was dropped and why, the numbers to beat next run (interrupts, rejections, error loops per session).

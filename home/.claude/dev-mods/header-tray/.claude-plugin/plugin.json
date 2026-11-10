@@ -1,0 +1,1 @@
+{"name":"header-tray","version":"0.2.0","description":"Band above the prompt with running agents and recent artifacts; pick an artifact to see its HTML page rendered in a terminal pane.","types":"./types/index.d.ts"}

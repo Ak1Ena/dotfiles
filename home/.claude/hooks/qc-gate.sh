@@ -89,13 +89,18 @@ is_teammate() {  # teammates are verified by their lead's guardrail
 }
 
 teammate_busy() {  # lead stops while a teammate still works: its edits are mid-flight, gate later
-  # only configs written in the last hour: a crashed teammate's stale isActive=true must not disable the gate
-  # shortcut: a teammate silent for >1h counts as idle, so the lead gets blocked; raise -mmin if that bites
-  local f
-  for f in "$QC_TEAMS_DIR"/*/config.json; do
-    [[ -n $(find "$f" -mmin -60 2>/dev/null) ]] || continue
-    jq -e --arg s "$sid" '.leadSessionId == $s and any(.members[]?; .isActive == true and .agentType != "team-lead")' "$f" >/dev/null 2>&1 && return 0
-  done
+  # Live teammate processes name their lead via --parent-session-id (survives --continue, unlike the
+  # config's leadSessionId); only they count, so a crashed teammate's stale isActive=true cannot disable the gate.
+  local team name
+  while read -r team name; do
+    jq -e --arg n "$name" 'any(.members[]?; .name == $n and .isActive == true)' \
+      "$QC_TEAMS_DIR/$team/config.json" >/dev/null 2>&1 && return 0
+  done < <(${QC_PS:-ps -ax -o args=} 2>/dev/null | awk -v s="$sid" '
+    { t = n = p = ""
+      for (i = 1; i < NF; i++) {
+        if ($i == "--team-name") t = $(i+1); if ($i == "--agent-name") n = $(i+1); if ($i == "--parent-session-id") p = $(i+1)
+      }
+      if (p == s && t != "" && n != "") print t, n }')
   return 1
 }
 

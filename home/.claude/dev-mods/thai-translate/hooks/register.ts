@@ -202,6 +202,10 @@ function tick($: EngineInterface, w: Work) {
 
 export const register: Register = on => {
   const w: Work = { ready: new Set(), tails: new Map(), tried: new Set(), busy: false, warned: false }
+  // Messages drawn while translation was off stay original once it is on; ones drawn while on keep translating.
+  // In memory only: a restart redraws the whole transcript, and everything then draws as it comes.
+  const seenOff = new Set<string>()
+  const seenOn = new Set<string>()
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'thai', description: 'Translate prompts and replies: /thai on|off, /thai en (Claude works in English), /thai cn (Claude works in Chinese)' })
@@ -222,6 +226,8 @@ export const register: Register = on => {
     $.ui.status(undefined)
     w.ready.clear()
     w.tails.clear()
+    seenOff.clear()
+    seenOn.clear()
     return next(e)
   })
 
@@ -296,7 +302,11 @@ export const register: Register = on => {
   // the question dialog: question, option labels and descriptions shown translated once ready (previews are code-like, kept)
   on('ui.render', { component: 'AskUserQuestion' }, async ($, e, next) => {
     const plan = await active($)
-    if (!plan) return next(e)
+    if (!plan || seenOff.has(e.requestId)) {
+      if (!plan && !seenOn.has(e.requestId)) seenOff.add(e.requestId)
+      return next(e)
+    }
+    seenOn.add(e.requestId)
     tick($, w)
     const done = await read($, thai)
     let changed = false
@@ -323,7 +333,11 @@ export const register: Register = on => {
   // the one still being written stays as written until it settles.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     const plan = await active($)
-    if (!plan) return next(e)
+    if (!plan || seenOff.has(e.requestId)) {
+      if (!plan && !seenOn.has(e.requestId)) seenOff.add(e.requestId)
+      return next(e)
+    }
+    seenOn.add(e.requestId)
     tick($, w)
     const done = await read($, thai)
     const ps = pieces(e.props.text)
